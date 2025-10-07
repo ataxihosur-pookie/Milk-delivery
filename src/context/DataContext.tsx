@@ -123,7 +123,7 @@ interface DataContextType {
   addDailyAllocation: (allocation: Omit<DailyAllocation, 'id'>) => Promise<void>;
   assignCustomersToPartner: (partnerId: string, customerIds: string[]) => Promise<void>;
   assignRouteToPartner: (routeId: string, partnerId: string) => Promise<void>;
-  updateDeliveryStatus: (deliveryId: string, status: 'pending' | 'completed' | 'cancelled', notes?: string) => Promise<void>;
+  updateDeliveryStatus: (deliveryId: string, status: 'pending' | 'completed' | 'cancelled', notes?: string, quantity?: number) => Promise<void>;
   updateDeliveryQuantity: (deliveryId: string, quantity: number) => Promise<void>;
   logPickup: (farmerId: string, deliveryPartnerId: string, routeId: string, quantity: number, notes?: string) => Promise<void>;
   getDailyAllocation: (partnerId: string, date: string) => DailyAllocation | undefined;
@@ -943,45 +943,82 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     loadLocalDeliveries();
   }, []);
 
-  const updateDeliveryStatus = async (deliveryId: string, status: 'pending' | 'completed' | 'cancelled', notes?: string) => {
+  const updateDeliveryStatus = async (deliveryId: string, status: 'pending' | 'completed' | 'cancelled', notes?: string, quantity?: number) => {
     try {
-      console.log('Updating delivery status:', { deliveryId, status, notes });
-      
-      // Update local state
-      setDeliveries(prev => 
-        prev.map(delivery => 
+      console.log('Updating delivery status:', { deliveryId, status, notes, quantity });
+
+      // Check if delivery exists
+      let existingDelivery = deliveries.find(d => d.id === deliveryId);
+
+      // If delivery doesn't exist, create it from the deliveryId pattern
+      if (!existingDelivery) {
+        const parts = deliveryId.split('_');
+        if (parts.length >= 3) {
+          const customerId = parts[0];
+          const partnerId = parts[1];
+          const date = parts[2];
+
+          const customer = customers.find(c => c.id === customerId);
+          const partner = deliveryPartners.find(p => p.id === partnerId);
+
+          if (customer && partner) {
+            const newDelivery: Delivery = {
+              id: deliveryId,
+              customerId: customerId,
+              customerName: customer.name,
+              deliveryPartnerId: partnerId,
+              supplierId: partner.supplierId,
+              quantity: quantity || customer.dailyQuantity,
+              date: date,
+              status: status,
+              notes: notes || '',
+              completedTime: status === 'completed' ? new Date().toISOString() : undefined
+            };
+
+            setDeliveries(prev => [...prev, newDelivery]);
+            const currentDeliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+            currentDeliveries.push(newDelivery);
+            localStorage.setItem('deliveries', JSON.stringify(currentDeliveries));
+
+            existingDelivery = newDelivery;
+            console.log('Created new delivery:', newDelivery);
+          }
+        }
+      } else {
+        // Update existing delivery
+        setDeliveries(prev =>
+          prev.map(delivery =>
+            delivery.id === deliveryId ? {
+              ...delivery,
+              status,
+              notes,
+              quantity: quantity !== undefined ? quantity : delivery.quantity,
+              completedTime: status === 'completed' ? new Date().toISOString() : delivery.completedTime
+            } : delivery
+          )
+        );
+
+        // Update localStorage
+        const currentDeliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
+        const updatedDeliveries = currentDeliveries.map((delivery: any) =>
           delivery.id === deliveryId ? {
             ...delivery,
             status,
             notes,
+            quantity: quantity !== undefined ? quantity : delivery.quantity,
             completedTime: status === 'completed' ? new Date().toISOString() : delivery.completedTime
           } : delivery
-        )
-      );
-      
-      console.log('Delivery status updated in local state');
-
-      // Update localStorage
-      const currentDeliveries = JSON.parse(localStorage.getItem('deliveries') || '[]');
-      const updatedDeliveries = currentDeliveries.map((delivery: any) => 
-        delivery.id === deliveryId ? {
-          ...delivery,
-          status,
-          notes,
-          completedTime: status === 'completed' ? new Date().toISOString() : delivery.completedTime
-        } : delivery
-      );
-      localStorage.setItem('deliveries', JSON.stringify(updatedDeliveries));
-      console.log('localStorage updated');
+        );
+        localStorage.setItem('deliveries', JSON.stringify(updatedDeliveries));
+        console.log('localStorage updated');
+      }
 
       // Update remaining quantity if completed
-      if (status === 'completed') {
-        const deliveryToUpdate = deliveries.find(d => d.id === deliveryId);
-        if (deliveryToUpdate) {
-          await updateRemainingQuantity(deliveryToUpdate.deliveryPartnerId, deliveryToUpdate.date, deliveryToUpdate.quantity);
-        }
+      if (status === 'completed' && existingDelivery) {
+        const finalQuantity = quantity !== undefined ? quantity : existingDelivery.quantity;
+        await updateRemainingQuantity(existingDelivery.deliveryPartnerId, existingDelivery.date, finalQuantity);
       }
-      
+
     } catch (error: any) {
       console.error('Error updating delivery status:', error);
       throw error;

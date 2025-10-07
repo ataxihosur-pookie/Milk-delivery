@@ -12,6 +12,7 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
   const { deliveries, customers, dailyAllocations, deliveryPartners, updateDeliveryStatus, refreshData } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
+  const [editingQuantity, setEditingQuantity] = useState<{[customerId: string]: number}>({});
   const [todayProgress, setTodayProgress] = useState({
     allocated: 0,
     delivered: 0,
@@ -62,8 +63,33 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
     calculateProgress();
   }, [dailyAllocations, deliveries, partnerId, today, assignedCustomers.length]);
 
+  // Initialize editing quantities when customers change
+  useEffect(() => {
+    const initialQuantities: {[customerId: string]: number} = {};
+    assignedCustomers.forEach(customer => {
+      initialQuantities[customer.id] = customer.dailyQuantity;
+    });
+    setEditingQuantity(initialQuantities);
+  }, [assignedCustomers]);
+
+  // Handle quantity change
+  const handleQuantityChange = (customerId: string, value: string) => {
+    const numValue = parseFloat(value) || 0;
+    setEditingQuantity(prev => ({
+      ...prev,
+      [customerId]: numValue
+    }));
+  };
+
   // Handle delivery completion
-  const handleDeliveryComplete = async (customerId: string, customerName: string, quantity: number) => {
+  const handleDeliveryComplete = async (customerId: string, customerName: string, defaultQuantity: number) => {
+    const quantity = editingQuantity[customerId] || defaultQuantity;
+
+    if (quantity <= 0) {
+      alert('❌ Please enter a valid quantity greater than 0');
+      return;
+    }
+
     if (todayProgress.remaining < quantity) {
       alert(`❌ Insufficient milk quantity!\n\nTrying to deliver: ${quantity}L\nRemaining: ${todayProgress.remaining}L\n\nContact your supplier for more allocation.`);
       return;
@@ -73,19 +99,20 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
 
     try {
       // Find or create delivery record
-      let delivery = deliveries.find(d => 
-        d.customerId === customerId && 
-        d.deliveryPartnerId === partnerId && 
+      let delivery = deliveries.find(d =>
+        d.customerId === customerId &&
+        d.deliveryPartnerId === partnerId &&
         d.date === today
       );
 
       const deliveryId = delivery?.id || `${customerId}_${partnerId}_${today}`;
 
-      // Update delivery status
+      // Update delivery status with the edited quantity
       await updateDeliveryStatus(
-        deliveryId, 
-        'completed', 
-        `✅ Delivered ${quantity}L to ${customerName} on ${today}`
+        deliveryId,
+        'completed',
+        `✅ Delivered ${quantity}L to ${customerName} on ${today}`,
+        quantity
       );
 
       // Refresh data to get updated state
@@ -379,12 +406,12 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                               </div>
                             </div>
                           </div>
-                          
+
                           <div className="text-right">
-                            <div className="text-2xl font-bold text-blue-600 mb-2">{customer.dailyQuantity}L</div>
+                            <div className="text-sm text-gray-500 mb-2">Default: {customer.dailyQuantity}L</div>
                             <div className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${
-                              isCompleted 
-                                ? 'bg-green-100 text-green-800' 
+                              isCompleted
+                                ? 'bg-green-100 text-green-800'
                                 : isFailed
                                 ? 'bg-red-100 text-red-800'
                                 : 'bg-yellow-100 text-yellow-800'
@@ -393,6 +420,55 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                             </div>
                           </div>
                         </div>
+
+                        {/* Quantity Editor */}
+                        {!isCompleted && (
+                          <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                            <label className="block text-sm font-medium text-blue-900 mb-2">
+                              Delivery Quantity (Liters)
+                            </label>
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="number"
+                                step="0.5"
+                                min="0"
+                                value={editingQuantity[customer.id] || customer.dailyQuantity}
+                                onChange={(e) => handleQuantityChange(customer.id, e.target.value)}
+                                disabled={isCompleted || isUpdating === customer.id}
+                                className="flex-1 px-4 py-3 text-lg font-semibold border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
+                                placeholder="Enter quantity"
+                              />
+                              <div className="flex flex-col space-y-1">
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(customer.id, String((editingQuantity[customer.id] || customer.dailyQuantity) + 0.5))}
+                                  disabled={isCompleted || isUpdating === customer.id}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  +0.5
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuantityChange(customer.id, String(Math.max(0, (editingQuantity[customer.id] || customer.dailyQuantity) - 0.5)))}
+                                  disabled={isCompleted || isUpdating === customer.id}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                  -0.5
+                                </button>
+                              </div>
+                            </div>
+                            <div className="mt-2 flex justify-between text-xs text-blue-700">
+                              <span>Default quantity: {customer.dailyQuantity}L</span>
+                              <button
+                                type="button"
+                                onClick={() => handleQuantityChange(customer.id, String(customer.dailyQuantity))}
+                                className="text-blue-600 hover:text-blue-800 font-medium underline"
+                              >
+                                Reset to default
+                              </button>
+                            </div>
+                          </div>
+                        )}
                         
                         {/* Action Buttons */}
                         <div className="flex justify-center space-x-6">
@@ -449,8 +525,17 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                         {(isCompleted || isFailed) && (
                           <div className="mt-4 p-3 bg-white rounded-lg border">
                             <div className="text-sm font-medium text-gray-700">
-                              {isCompleted ? 
-                                `✅ Delivery completed successfully - ${customer.dailyQuantity}L delivered` : 
+                              {isCompleted ? (
+                                (() => {
+                                  const delivery = deliveries.find(d =>
+                                    d.customerId === customer.id &&
+                                    d.deliveryPartnerId === partnerId &&
+                                    d.date === today
+                                  );
+                                  const deliveredQty = delivery?.quantity || customer.dailyQuantity;
+                                  return `✅ Delivery completed successfully - ${deliveredQty}L delivered`;
+                                })()
+                              ) :
                                 '❌ Delivery failed - No quantity deducted from allocation'}
                             </div>
                           </div>
