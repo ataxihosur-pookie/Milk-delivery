@@ -9,7 +9,7 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const { deliveryPartners } = useData();
+  const { deliveryPartners, suppliers } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -23,10 +23,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
     if (userRole === 'delivery_partner') {
       // For delivery partners, check against registered delivery partners
-      const partner = deliveryPartners.find(dp => 
+      const partner = deliveryPartners.find(dp =>
         dp.email === email && dp.password === password
       );
-      
+
       if (partner) {
         const user: User = {
           id: partner.id,
@@ -39,19 +39,50 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
       } else {
         setError('Invalid credentials. Please check your email and password.');
       }
+    } else if (userRole === 'supplier') {
+      // Check registered suppliers by username/password or email/password
+      const supplier = suppliers.find(s =>
+        s.status === 'approved' &&
+        ((s.username === email && s.password === password) ||
+         (s.email === email && s.password === password))
+      );
+
+      if (supplier) {
+        const user: User = {
+          id: supplier.id,
+          name: supplier.name,
+          email: supplier.email,
+          role: 'supplier',
+          supplierId: supplier.id
+        };
+        onLogin(user);
+      } else {
+        // Fallback to demo credentials
+        if (email === 'admin@puredairy.com' && password === 'supplier123') {
+          const user: User = {
+            id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
+            name: 'Pure Dairy Farm',
+            email: 'admin@puredairy.com',
+            role: 'supplier',
+            supplierId: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'
+          };
+          onLogin(user);
+        } else {
+          setError('Invalid credentials or account not approved yet.');
+        }
+      }
     } else {
       // Demo login credentials for other roles
       const demoCredentials = {
         admin: { email: 'admin@milkchain.com', password: 'admin123', name: 'Admin User' },
-        supplier: { email: 'admin@puredairy.com', password: 'supplier123', name: 'Pure Dairy Farm', id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11' },
         customer: { email: 'john@example.com', password: 'customer123', name: 'John Smith' }
       };
 
       const credentials = demoCredentials[userRole as keyof typeof demoCredentials];
-      
+
       if (credentials && email === credentials.email && password === credentials.password) {
         const user: User = {
-          id: userRole === 'supplier' ? (credentials.id || 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11') : `${userRole}-1`,
+          id: `${userRole}-1`,
           name: credentials.name,
           email: credentials.email,
           role: userRole,
@@ -135,18 +166,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  {userRole === 'delivery_partner' ? 'Email Address' : 'Email address'}
+                  {userRole === 'supplier' ? 'Username or Email' : userRole === 'delivery_partner' ? 'Email Address' : 'Email address'}
                 </label>
                 <input
                   id="email"
                   name="email"
-                  type="email"
-                  autoComplete="email"
+                  type={userRole === 'supplier' ? 'text' : 'email'}
+                  autoComplete={userRole === 'supplier' ? 'username' : 'email'}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder={userRole === 'delivery_partner' ? 'Enter your email address' : 'Enter your email'}
+                  placeholder={userRole === 'supplier' ? 'Enter username or email' : userRole === 'delivery_partner' ? 'Enter your email address' : 'Enter your email'}
                 />
               </div>
               <div className="relative">
@@ -206,7 +237,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <div className="mt-6 text-xs text-gray-500 space-y-2">
               <div className="font-semibold">Demo Credentials:</div>
               <div>Admin: admin@milkchain.com / admin123</div>
-              <div>Supplier: admin@puredairy.com / supplier123</div>
+              <div>Supplier: Use username/password from registration (or demo: admin@puredairy.com / supplier123)</div>
               <div>Delivery: Use email & password created by supplier</div>
               <div>Customer: john@example.com / customer123</div>
             </div>

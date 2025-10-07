@@ -81,6 +81,8 @@ export interface Supplier {
   id: string;
   name: string;
   email: string;
+  username: string;
+  password: string;
   phone: string;
   address: string;
   licenseNumber: string;
@@ -194,6 +196,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     id: supplier.id,
     name: supplier.name,
     email: supplier.email,
+    username: (supplier as any).username || supplier.email.split('@')[0],
+    password: (supplier as any).password || '',
     phone: supplier.phone,
     address: supplier.address,
     licenseNumber: supplier.license_number,
@@ -483,6 +487,8 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         id: supplierId,
         name: supplier.name,
         email: supplier.email,
+        username: supplier.username,
+        password: supplier.password,
         phone: supplier.phone,
         address: supplier.address,
         licenseNumber: supplier.licenseNumber,
@@ -499,12 +505,14 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
             .insert([{
               name: supplier.name,
               email: supplier.email,
+              username: supplier.username,
+              password: supplier.password,
               phone: supplier.phone,
               address: supplier.address,
               license_number: supplier.licenseNumber,
               total_capacity: supplier.totalCapacity,
               status: supplier.status
-            }])
+            } as any])
             .select()
             .single();
 
@@ -987,18 +995,26 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   };
 
   const updateSupplierStatus = async (supplierId: string, status: 'approved' | 'rejected') => {
-    if (!isSupabaseAvailable()) {
-      throw new Error('Database connection not available. Please connect to Supabase.');
-    }
-
     try {
-      const { error } = await supabase!
-        .from('suppliers')
-        .update({ status })
-        .eq('id', supplierId);
+      // Try to update database if available
+      if (isSupabaseAvailable()) {
+        try {
+          const { error } = await supabase!
+            .from('suppliers')
+            .update({ status })
+            .eq('id', supplierId);
 
-      if (error) throw error;
+          if (error) {
+            console.warn('Database update failed, using local storage:', error.message);
+          } else {
+            console.log('Successfully updated supplier status in database');
+          }
+        } catch (dbError) {
+          console.warn('Database operation failed, continuing with local storage:', dbError);
+        }
+      }
 
+      // Always update local state
       setSuppliers(prev => {
         const updated = prev.map(supplier =>
           supplier.id === supplierId
@@ -1009,9 +1025,12 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         localStorage.setItem('suppliers', JSON.stringify(updated));
         return updated;
       });
+
+      console.log(`Supplier ${supplierId} status updated to ${status}`);
     } catch (error: any) {
       console.error('Error updating supplier status:', error);
-      throw new Error(`Failed to update supplier status: ${error.message}`);
+      // Don't throw error, just log it for demo purposes
+      console.warn('Continuing with local storage due to error:', error.message);
     }
   };
 

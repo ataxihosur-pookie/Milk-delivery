@@ -12,6 +12,7 @@ const SupplierSignup: React.FC<SupplierSignupProps> = ({ onBack, onSignupSuccess
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    username: '',
     password: '',
     confirmPassword: '',
     phone: '',
@@ -54,6 +55,8 @@ const SupplierSignup: React.FC<SupplierSignupProps> = ({ onBack, onSignupSuccess
       await addSupplier({
         name: formData.name,
         email: formData.email,
+        username: formData.username,
+        password: formData.password,
         phone: formData.phone,
         address: formData.address,
         licenseNumber: formData.licenseNumber,
@@ -120,6 +123,21 @@ const SupplierSignup: React.FC<SupplierSignupProps> = ({ onBack, onSignupSuccess
                   onChange={handleChange}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter your email"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  name="username"
+                  required
+                  value={formData.username}
+                  onChange={handleChange}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Create a username for login"
                 />
               </div>
 
