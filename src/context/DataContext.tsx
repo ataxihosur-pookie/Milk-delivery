@@ -260,6 +260,17 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const refreshData = async () => {
     if (!isSupabaseAvailable()) {
       console.warn('Supabase connection not available, using local storage');
+
+      // Load from localStorage
+      try {
+        const savedSuppliers = localStorage.getItem('suppliers');
+        if (savedSuppliers) {
+          setSuppliers(JSON.parse(savedSuppliers));
+        }
+      } catch (error) {
+        console.error('Error loading suppliers from localStorage:', error);
+      }
+
       setLoading(false);
       return;
     }
@@ -510,7 +521,12 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       }
 
       // Always update local state
-      setSuppliers(prev => [newSupplier, ...prev]);
+      setSuppliers(prev => {
+        const updated = [newSupplier, ...prev];
+        // Save to localStorage
+        localStorage.setItem('suppliers', JSON.stringify(updated));
+        return updated;
+      });
 
       console.log('Supplier added successfully:', newSupplier);
     } catch (error: any) {
@@ -983,13 +999,16 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
       if (error) throw error;
 
-      setSuppliers(prev => 
-        prev.map(supplier => 
-          supplier.id === supplierId 
-            ? { ...supplier, status } 
+      setSuppliers(prev => {
+        const updated = prev.map(supplier =>
+          supplier.id === supplierId
+            ? { ...supplier, status }
             : supplier
-        )
-      );
+        );
+        // Save to localStorage
+        localStorage.setItem('suppliers', JSON.stringify(updated));
+        return updated;
+      });
     } catch (error: any) {
       console.error('Error updating supplier status:', error);
       throw new Error(`Failed to update supplier status: ${error.message}`);
