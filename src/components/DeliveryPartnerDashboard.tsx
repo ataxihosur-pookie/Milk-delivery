@@ -65,12 +65,19 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
 
   // Initialize editing quantities when customers change
   useEffect(() => {
-    const initialQuantities: {[customerId: string]: number} = {};
-    assignedCustomers.forEach(customer => {
-      initialQuantities[customer.id] = customer.dailyQuantity;
-    });
-    setEditingQuantity(initialQuantities);
-  }, [assignedCustomers]);
+    if (assignedCustomers.length > 0) {
+      setEditingQuantity(prev => {
+        const initialQuantities: {[customerId: string]: number} = { ...prev };
+        assignedCustomers.forEach(customer => {
+          // Only set if not already set
+          if (initialQuantities[customer.id] === undefined) {
+            initialQuantities[customer.id] = customer.dailyQuantity;
+          }
+        });
+        return initialQuantities;
+      });
+    }
+  }, [assignedCustomers.length, assignedCustomers.map(c => c.id).join(',')]);
 
   // Handle quantity change
   const handleQuantityChange = (customerId: string, value: string) => {
@@ -422,7 +429,7 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                         </div>
 
                         {/* Quantity Editor */}
-                        {!isCompleted && (
+                        {!isCompleted && !isFailed && (
                           <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
                             <label className="block text-sm font-medium text-blue-900 mb-2">
                               Delivery Quantity (Liters)
@@ -432,26 +439,32 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                                 type="number"
                                 step="0.5"
                                 min="0"
-                                value={editingQuantity[customer.id] || customer.dailyQuantity}
+                                value={editingQuantity[customer.id] !== undefined ? editingQuantity[customer.id] : customer.dailyQuantity}
                                 onChange={(e) => handleQuantityChange(customer.id, e.target.value)}
-                                disabled={isCompleted || isUpdating === customer.id}
+                                disabled={isUpdating === customer.id}
                                 className="flex-1 px-4 py-3 text-lg font-semibold border border-blue-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:cursor-not-allowed"
                                 placeholder="Enter quantity"
                               />
                               <div className="flex flex-col space-y-1">
                                 <button
                                   type="button"
-                                  onClick={() => handleQuantityChange(customer.id, String((editingQuantity[customer.id] || customer.dailyQuantity) + 0.5))}
-                                  disabled={isCompleted || isUpdating === customer.id}
-                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  onClick={() => {
+                                    const current = editingQuantity[customer.id] !== undefined ? editingQuantity[customer.id] : customer.dailyQuantity;
+                                    handleQuantityChange(customer.id, String(current + 0.5));
+                                  }}
+                                  disabled={isUpdating === customer.id}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                   +0.5
                                 </button>
                                 <button
                                   type="button"
-                                  onClick={() => handleQuantityChange(customer.id, String(Math.max(0, (editingQuantity[customer.id] || customer.dailyQuantity) - 0.5)))}
-                                  disabled={isCompleted || isUpdating === customer.id}
-                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                                  onClick={() => {
+                                    const current = editingQuantity[customer.id] !== undefined ? editingQuantity[customer.id] : customer.dailyQuantity;
+                                    handleQuantityChange(customer.id, String(Math.max(0, current - 0.5)));
+                                  }}
+                                  disabled={isUpdating === customer.id}
+                                  className="px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                   -0.5
                                 </button>
@@ -462,7 +475,8 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                               <button
                                 type="button"
                                 onClick={() => handleQuantityChange(customer.id, String(customer.dailyQuantity))}
-                                className="text-blue-600 hover:text-blue-800 font-medium underline"
+                                disabled={isUpdating === customer.id}
+                                className="text-blue-600 hover:text-blue-800 font-medium underline disabled:opacity-50"
                               >
                                 Reset to default
                               </button>
