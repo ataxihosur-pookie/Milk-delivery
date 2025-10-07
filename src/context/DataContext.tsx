@@ -281,6 +281,23 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         if (savedCustomers) {
           setCustomers(JSON.parse(savedCustomers));
         }
+
+        const savedAssignments = localStorage.getItem('customerAssignments');
+        if (savedAssignments) {
+          const assignments = JSON.parse(savedAssignments);
+          setCustomerAssignments(assignments);
+
+          // Update delivery partners with their assigned customers
+          const savedPartners = localStorage.getItem('deliveryPartners');
+          if (savedPartners) {
+            const partners = JSON.parse(savedPartners);
+            const updatedPartners = partners.map((partner: DeliveryPartner) => ({
+              ...partner,
+              assignedCustomers: assignments[partner.id] || partner.assignedCustomers || []
+            }));
+            setDeliveryPartners(updatedPartners);
+          }
+        }
       } catch (error) {
         console.error('Error loading data from localStorage:', error);
       }
@@ -865,14 +882,25 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         ...customerAssignments,
         [partnerId]: customerIds
       };
-      
+
       console.log('Updating customer assignments:', newAssignments);
       setCustomerAssignments(newAssignments);
-      
+
+      // Update the delivery partner's assignedCustomers array directly
+      setDeliveryPartners(prev => {
+        const updated = prev.map(partner =>
+          partner.id === partnerId
+            ? { ...partner, assignedCustomers: customerIds }
+            : partner
+        );
+        localStorage.setItem('deliveryPartners', JSON.stringify(updated));
+        return updated;
+      });
+
       // Save to localStorage as backup
       localStorage.setItem('customerAssignments', JSON.stringify(newAssignments));
-      console.log('Saved assignments to localStorage');
-      
+      console.log('Saved assignments to localStorage and updated delivery partners');
+
     } catch (error: any) {
       console.error('Error assigning customers to partner:', error);
       // Still update local state even if database fails
@@ -881,6 +909,18 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         [partnerId]: customerIds
       };
       setCustomerAssignments(newAssignments);
+
+      // Update delivery partners
+      setDeliveryPartners(prev => {
+        const updated = prev.map(partner =>
+          partner.id === partnerId
+            ? { ...partner, assignedCustomers: customerIds }
+            : partner
+        );
+        localStorage.setItem('deliveryPartners', JSON.stringify(updated));
+        return updated;
+      });
+
       localStorage.setItem('customerAssignments', JSON.stringify(newAssignments));
     }
   };
