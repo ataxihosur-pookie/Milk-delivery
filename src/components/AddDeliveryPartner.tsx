@@ -10,6 +10,7 @@ interface AddDeliveryPartnerProps {
 }
 
 const AddDeliveryPartner: React.FC<AddDeliveryPartnerProps> = ({ supplierId, onClose, onSuccess }) => {
+  const { addDeliveryPartner } = useData();
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -38,92 +39,26 @@ const AddDeliveryPartner: React.FC<AddDeliveryPartnerProps> = ({ supplierId, onC
     setError('');
 
     try {
-      // Check database connection first
-      // Try database insert first, but don't fail if it doesn't work
-      // Generate unique user ID
-      const userId = `dp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Prepare data for insertion
-      const insertData = {
-        supplier_id: supplierId,
+      // Use the addDeliveryPartner function from DataContext
+      await addDeliveryPartner({
         name: formData.name.trim(),
         email: formData.email.trim().toLowerCase(),
         phone: formData.phone.trim(),
-        vehicle_number: formData.vehicleNumber.trim().toUpperCase(),
-        user_id: userId,
+        supplierId: supplierId,
+        vehicleNumber: formData.vehicleNumber.trim().toUpperCase(),
         password: formData.password,
-        status: 'active' as const
-      };
+        status: 'active'
+      });
 
-      // Insert into database with proper error handling
-      const { data, error: insertError } = await supabase!
-        .from('delivery_partners')
-        .insert([insertData])
-        .select()
-        .single();
+      alert(`Delivery partner "${formData.name}" added successfully!\n\nLogin credentials:\nEmail: ${formData.email}\nPassword: ${formData.password}\n\nThey can now login using these credentials.`);
 
-      if (insertError) {
-        console.error('Database insert error:', insertError);
-        
-        // For demo purposes, continue with local storage if database fails
-        console.warn('Database insert failed, continuing with local storage:', insertError.message);
-        
-        // Add to local state for demo purposes
-        const localPartner = {
-          id: userId,
-          name: formData.name,
-          email: formData.email,
-          phone: formData.phone,
-          supplierId: supplierId,
-          vehicleNumber: formData.vehicleNumber,
-          status: 'active' as const,
-          password: formData.password,
-          assignedCustomers: [],
-          dailyAllocation: 0,
-          remainingQuantity: 0
-        };
-        
-        // Update local state through context
-        onSuccess();
-        
-        alert(`Delivery partner "${formData.name}" added successfully!\n\nLogin credentials:\nEmail: ${formData.email}\nPassword: ${formData.password}\n\n⚠️ Note: Saved locally for demo purposes. Database permissions may need adjustment for permanent storage.`);
-        onClose();
-        return;
-      }
-      
-      // Success - data saved to database
-      console.log('Delivery partner saved to database successfully:', data);
-      
-      alert(`Delivery partner "${formData.name}" added successfully!\n\nLogin credentials:\nEmail: ${formData.email}\nPassword: ${formData.password}\n\n✅ Data saved permanently to database.`);
-      
-      // Update local state and close modal
+      // Notify parent and close
       onSuccess();
       onClose();
-      
+
     } catch (error: any) {
       console.error('Error adding delivery partner:', error);
-      
-      // For demo purposes, still allow local storage
-      const userId = `dp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const localPartner = {
-        id: userId,
-        name: formData.name,
-        email: formData.email,
-        phone: formData.phone,
-        supplierId: supplierId,
-        vehicleNumber: formData.vehicleNumber,
-        status: 'active' as const,
-        password: formData.password,
-        assignedCustomers: [],
-        dailyAllocation: 0,
-        remainingQuantity: 0
-      };
-      
-      // Update local state
-      onSuccess();
-      
-      alert(`Delivery partner "${formData.name}" added successfully!\n\nLogin credentials:\nEmail: ${formData.email}\nPassword: ${formData.password}\n\n⚠️ Note: Saved locally for demo purposes due to: ${error.message}`);
-      onClose();
+      setError(error.message || 'Failed to add delivery partner. Please try again.');
     } finally {
       setIsSubmitting(false);
     }

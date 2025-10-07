@@ -271,8 +271,18 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         if (savedSuppliers) {
           setSuppliers(JSON.parse(savedSuppliers));
         }
+
+        const savedPartners = localStorage.getItem('deliveryPartners');
+        if (savedPartners) {
+          setDeliveryPartners(JSON.parse(savedPartners));
+        }
+
+        const savedCustomers = localStorage.getItem('customers');
+        if (savedCustomers) {
+          setCustomers(JSON.parse(savedCustomers));
+        }
       } catch (error) {
-        console.error('Error loading suppliers from localStorage:', error);
+        console.error('Error loading data from localStorage:', error);
       }
 
       setLoading(false);
@@ -591,9 +601,15 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
       }
       
-      // Always update local state
-      setDeliveryPartners(prev => [newPartner, ...prev]);
-      
+      // Always update local state and persist to localStorage
+      setDeliveryPartners(prev => {
+        const updated = [newPartner, ...prev];
+        localStorage.setItem('deliveryPartners', JSON.stringify(updated));
+        return updated;
+      });
+
+      console.log('Delivery partner added successfully:', newPartner);
+
     } catch (error: any) {
       console.error('Error adding delivery partner:', error);
       // Don't throw error, just log it for demo purposes
@@ -645,9 +661,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
       }
       
-      // Always update local state
-      setCustomers(prev => [newCustomer, ...prev]);
-      
+      // Always update local state and persist to localStorage
+      setCustomers(prev => {
+        const updated = [newCustomer, ...prev];
+        localStorage.setItem('customers', JSON.stringify(updated));
+        return updated;
+      });
+
       console.log('Customer added successfully:', newCustomer);
       return newCustomer;
     } catch (error: any) {
