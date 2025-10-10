@@ -263,6 +263,35 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     createdAt: allocation.created_at
   });
 
+  const convertFarmer = (farmer: any): Farmer => ({
+    id: farmer.id,
+    name: farmer.name,
+    email: farmer.email || '',
+    phone: farmer.phone,
+    address: farmer.address || '',
+    supplierId: farmer.supplier_id,
+    userId: farmer.user_id,
+    password: farmer.password,
+    status: farmer.status
+  });
+
+  const convertPickupLog = (log: any): PickupLog => ({
+    id: log.id,
+    farmerId: log.farmer_id,
+    supplierId: log.supplier_id,
+    deliveryPartnerId: log.delivery_partner_id,
+    quantity: log.quantity,
+    qualityGrade: log.quality_grade,
+    fatContent: log.fat_content,
+    pricePerLiter: log.price_per_liter,
+    totalAmount: log.total_amount,
+    date: log.pickup_date,
+    pickupTime: log.pickup_time,
+    status: log.status,
+    notes: log.notes,
+    createdAt: log.created_at
+  });
+
   // Check if Supabase is available
   const isSupabaseAvailable = () => {
     return supabase !== null;
@@ -288,6 +317,16 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         const savedCustomers = localStorage.getItem('customers');
         if (savedCustomers) {
           setCustomers(JSON.parse(savedCustomers));
+        }
+
+        const savedFarmers = localStorage.getItem('farmers');
+        if (savedFarmers) {
+          setFarmers(JSON.parse(savedFarmers));
+        }
+
+        const savedPickupLogs = localStorage.getItem('pickupLogs');
+        if (savedPickupLogs) {
+          setPickupLogs(JSON.parse(savedPickupLogs));
         }
 
         const savedAssignments = localStorage.getItem('customerAssignments');
@@ -362,6 +401,30 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
 
       if (allocationsError) throw allocationsError;
       setDailyAllocations((allocationsData || []).map(convertDailyAllocation));
+
+      // Load farmers
+      const { data: farmersData, error: farmersError } = await supabase!
+        .from('farmers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (farmersError) {
+        console.warn('Error loading farmers:', farmersError);
+      } else {
+        setFarmers((farmersData || []).map(convertFarmer));
+      }
+
+      // Load pickup logs
+      const { data: pickupLogsData, error: pickupLogsError } = await supabase!
+        .from('pickup_logs')
+        .select('*')
+        .order('pickup_time', { ascending: false });
+
+      if (pickupLogsError) {
+        console.warn('Error loading pickup logs:', pickupLogsError);
+      } else {
+        setPickupLogs((pickupLogsData || []).map(convertPickupLog));
+      }
 
     } catch (error: any) {
       console.error('Error loading data:', error);
@@ -1210,7 +1273,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
       }
 
-      setFarmers(prev => [newFarmer, ...prev]);
+      setFarmers(prev => {
+        const updated = [newFarmer, ...prev];
+        localStorage.setItem('farmers', JSON.stringify(updated));
+        return updated;
+      });
       console.log('Farmer added successfully:', newFarmer);
       return newFarmer;
     } catch (error: any) {
@@ -1287,7 +1354,11 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         }
       }
 
-      setPickupLogs(prev => [newPickup, ...prev]);
+      setPickupLogs(prev => {
+        const updated = [newPickup, ...prev];
+        localStorage.setItem('pickupLogs', JSON.stringify(updated));
+        return updated;
+      });
       console.log('Pickup log added successfully:', newPickup);
       return newPickup;
     } catch (error: any) {
