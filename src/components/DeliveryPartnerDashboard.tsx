@@ -270,10 +270,15 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
 
       await addPickupLog({
         farmerId: milkIntake.farmerId,
+        supplierId: currentPartner?.supplierId || '',
         deliveryPartnerId: partnerId,
-        routeId: currentPartner?.assignedCustomers[0] || 'default_route',
         quantity: milkIntake.quantity,
+        qualityGrade: 'A',
+        fatContent: 0,
+        pricePerLiter: 0,
+        totalAmount: 0,
         date: today,
+        pickupTime: new Date().toISOString(),
         status: 'completed',
         notes: milkIntake.notes,
         createdAt: new Date().toISOString()
@@ -314,11 +319,21 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
     try {
       setIsUpdating('temp-delivery');
 
-      const deliveryId = `temp_delivery_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      const tempCustomer = await addCustomer({
+        name: `[TEMP] ${tempDelivery.customerName}`,
+        email: `temp_${Date.now()}@temporary.com`,
+        phone: tempDelivery.customerPhone,
+        address: tempDelivery.customerAddress || 'Temporary address',
+        supplierId: currentPartner?.supplierId || '',
+        dailyQuantity: 0
+      });
+
+      if (!tempCustomer) {
+        throw new Error('Failed to create temporary customer');
+      }
 
       await addDelivery({
-        customerId: deliveryId,
-        customerName: tempDelivery.customerName,
+        customerId: tempCustomer.id,
         deliveryPartnerId: partnerId,
         supplierId: currentPartner?.supplierId || '',
         quantity: tempDelivery.quantity,
@@ -327,7 +342,7 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
         status: 'completed',
         scheduledTime: new Date().toISOString(),
         completedTime: new Date().toISOString(),
-        notes: `TEMPORARY DELIVERY\nPhone: ${tempDelivery.customerPhone}\nAddress: ${tempDelivery.customerAddress}\nNotes: ${tempDelivery.notes}`
+        notes: `TEMPORARY DELIVERY - ${tempDelivery.notes || 'One-time delivery'}`
       });
 
       alert(`Temporary delivery recorded!\n\nCustomer: ${tempDelivery.customerName}\nQuantity: ${tempDelivery.quantity}L`);
@@ -343,7 +358,7 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
       await refreshData();
     } catch (error) {
       console.error('Error recording temporary delivery:', error);
-      alert('Failed to record temporary delivery. Please try again.');
+      alert(`Failed to record temporary delivery: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setIsUpdating(null);
     }
@@ -1081,20 +1096,32 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
               <h4 className="font-semibold text-gray-900 mb-4">Today's Temporary Deliveries</h4>
               <div className="space-y-3">
                 {deliveries
-                  .filter(d => d.deliveryPartnerId === partnerId && d.date === today && d.id.startsWith('temp_delivery'))
-                  .map(delivery => (
-                    <div key={delivery.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                      <div>
-                        <p className="font-medium text-gray-900">{delivery.customerName}</p>
-                        <p className="text-sm text-gray-500">{delivery.notes?.split('\n')[1] || ''}</p>
+                  .filter(d => {
+                    const customer = customers.find(c => c.id === d.customerId);
+                    return d.deliveryPartnerId === partnerId &&
+                           d.date === today &&
+                           d.status === 'completed' &&
+                           customer?.name.startsWith('[TEMP]');
+                  })
+                  .map(delivery => {
+                    const customer = customers.find(c => c.id === delivery.customerId);
+                    return (
+                      <div key={delivery.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900">{customer?.name.replace('[TEMP] ', '') || 'Unknown'}</p>
+                          <p className="text-sm text-gray-500">{customer?.phone} - {delivery.notes}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-orange-600">{delivery.quantity}L</p>
+                          <p className="text-xs text-gray-500">{delivery.completedTime ? new Date(delivery.completedTime).toLocaleTimeString() : ''}</p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-lg font-bold text-orange-600">{delivery.quantity}L</p>
-                        <p className="text-xs text-gray-500">{delivery.completedTime ? new Date(delivery.completedTime).toLocaleTimeString() : ''}</p>
-                      </div>
-                    </div>
-                  ))}
-                {deliveries.filter(d => d.deliveryPartnerId === partnerId && d.date === today && d.id.startsWith('temp_delivery')).length === 0 && (
+                    );
+                  })}
+                {deliveries.filter(d => {
+                  const customer = customers.find(c => c.id === d.customerId);
+                  return d.deliveryPartnerId === partnerId && d.date === today && customer?.name.startsWith('[TEMP]');
+                }).length === 0 && (
                   <p className="text-center text-gray-500 py-4">No temporary deliveries recorded today</p>
                 )}
               </div>

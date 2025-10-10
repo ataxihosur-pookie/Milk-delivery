@@ -40,6 +40,9 @@ export interface Farmer {
   phone: string;
   address: string;
   supplierId: string;
+  userId: string;
+  password: string;
+  status: 'active' | 'inactive';
   routeId?: string;
 }
 
@@ -55,10 +58,15 @@ export interface Route {
 export interface PickupLog {
   id: string;
   farmerId: string;
-  deliveryPartnerId: string;
-  routeId: string;
+  supplierId: string;
+  deliveryPartnerId?: string;
   quantity: number;
+  qualityGrade: 'A' | 'B' | 'C';
+  fatContent: number;
+  pricePerLiter: number;
+  totalAmount: number;
   date: string;
+  pickupTime: string;
   status: 'pending' | 'completed';
   notes?: string;
   createdAt: string;
@@ -1138,7 +1146,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const addFarmer = async (farmer: Omit<Farmer, 'id'>) => {
     try {
       const farmerId = `farmer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+
       const newFarmer: Farmer = {
         id: farmerId,
         name: farmer.name,
@@ -1146,8 +1154,31 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         phone: farmer.phone,
         address: farmer.address,
         supplierId: farmer.supplierId,
+        userId: farmer.userId,
+        password: farmer.password,
+        status: farmer.status || 'active',
         routeId: farmer.routeId
       };
+
+      if (isSupabaseAvailable()) {
+        const { error } = await supabase!
+          .from('farmers')
+          .insert([{
+            id: farmerId,
+            supplier_id: farmer.supplierId,
+            name: farmer.name,
+            email: farmer.email,
+            phone: farmer.phone,
+            address: farmer.address,
+            user_id: farmer.userId,
+            password: farmer.password,
+            status: farmer.status || 'active'
+          }]);
+
+        if (error) {
+          console.warn('Database insert failed, continuing with local storage:', error);
+        }
+      }
 
       setFarmers(prev => [newFarmer, ...prev]);
       console.log('Farmer added successfully:', newFarmer);
@@ -1183,18 +1214,48 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const addPickupLog = async (pickup: Omit<PickupLog, 'id'>) => {
     try {
       const pickupId = `pickup_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
+      const totalAmount = pickup.quantity * pickup.pricePerLiter;
+
       const newPickup: PickupLog = {
         id: pickupId,
         farmerId: pickup.farmerId,
+        supplierId: pickup.supplierId,
         deliveryPartnerId: pickup.deliveryPartnerId,
-        routeId: pickup.routeId,
         quantity: pickup.quantity,
+        qualityGrade: pickup.qualityGrade || 'A',
+        fatContent: pickup.fatContent || 0,
+        pricePerLiter: pickup.pricePerLiter,
+        totalAmount,
         date: pickup.date,
-        status: pickup.status,
+        pickupTime: pickup.pickupTime || new Date().toISOString(),
+        status: pickup.status || 'completed',
         notes: pickup.notes,
         createdAt: new Date().toISOString()
       };
+
+      if (isSupabaseAvailable()) {
+        const { error } = await supabase!
+          .from('pickup_logs')
+          .insert([{
+            id: pickupId,
+            farmer_id: pickup.farmerId,
+            supplier_id: pickup.supplierId,
+            delivery_partner_id: pickup.deliveryPartnerId,
+            quantity: pickup.quantity,
+            quality_grade: pickup.qualityGrade || 'A',
+            fat_content: pickup.fatContent || 0,
+            price_per_liter: pickup.pricePerLiter,
+            total_amount: totalAmount,
+            pickup_date: pickup.date,
+            pickup_time: pickup.pickupTime || new Date().toISOString(),
+            status: pickup.status || 'completed',
+            notes: pickup.notes
+          }]);
+
+        if (error) {
+          console.warn('Database insert failed, continuing with local storage:', error);
+        }
+      }
 
       setPickupLogs(prev => [newPickup, ...prev]);
       console.log('Pickup log added successfully:', newPickup);
