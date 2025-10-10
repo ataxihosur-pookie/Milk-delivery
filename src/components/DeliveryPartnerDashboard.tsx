@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { LogOut, Package, Calendar, MapPin, Truck, Users, CheckCircle, Clock, XCircle, RefreshCw, Droplets, TrendingUp } from 'lucide-react';
+import { LogOut, Package, Calendar, MapPin, Truck, Users, CheckCircle, Clock, XCircle, RefreshCw, Droplets, TrendingUp, UserPlus, Milk } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -9,7 +9,7 @@ interface DeliveryPartnerDashboardProps {
 }
 
 const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ user, onLogout }) => {
-  const { deliveries, customers, dailyAllocations, deliveryPartners, updateDeliveryStatus, refreshData } = useData();
+  const { deliveries, customers, dailyAllocations, deliveryPartners, updateDeliveryStatus, refreshData, addCustomer, addPickupLog, addDelivery, pickupLogs, farmers } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<{[customerId: string]: number}>({});
@@ -19,6 +19,31 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
     remaining: 0,
     completedDeliveries: 0,
     totalCustomers: 0
+  });
+
+  // New customer form state
+  const [newCustomer, setNewCustomer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    dailyQuantity: 1
+  });
+
+  // Milk intake form state
+  const [milkIntake, setMilkIntake] = useState({
+    farmerId: '',
+    quantity: 0,
+    notes: ''
+  });
+
+  // Temporary delivery form state
+  const [tempDelivery, setTempDelivery] = useState({
+    customerName: '',
+    customerPhone: '',
+    customerAddress: '',
+    quantity: 0,
+    notes: ''
   });
 
   // Get current delivery partner info
@@ -183,12 +208,145 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
 
   // Get delivery status for a customer
   const getDeliveryStatus = (customerId: string) => {
-    const delivery = deliveries.find(d => 
-      d.customerId === customerId && 
-      d.deliveryPartnerId === partnerId && 
+    const delivery = deliveries.find(d =>
+      d.customerId === customerId &&
+      d.deliveryPartnerId === partnerId &&
       d.date === today
     );
     return delivery?.status || 'pending';
+  };
+
+  // Handle add new customer
+  const handleAddCustomer = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newCustomer.name || !newCustomer.phone || !newCustomer.address) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setIsUpdating('adding-customer');
+
+      await addCustomer({
+        name: newCustomer.name,
+        email: newCustomer.email,
+        phone: newCustomer.phone,
+        address: newCustomer.address,
+        supplierId: currentPartner?.supplierId || '',
+        dailyQuantity: newCustomer.dailyQuantity
+      });
+
+      alert(`Customer "${newCustomer.name}" added successfully!`);
+
+      setNewCustomer({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        dailyQuantity: 1
+      });
+
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding customer:', error);
+      alert('Failed to add customer. Please try again.');
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  // Handle record milk intake
+  const handleRecordMilkIntake = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!milkIntake.farmerId || milkIntake.quantity <= 0) {
+      alert('Please select a farmer and enter a valid quantity');
+      return;
+    }
+
+    try {
+      setIsUpdating('recording-intake');
+
+      await addPickupLog({
+        farmerId: milkIntake.farmerId,
+        deliveryPartnerId: partnerId,
+        routeId: currentPartner?.assignedCustomers[0] || 'default_route',
+        quantity: milkIntake.quantity,
+        date: today,
+        status: 'completed',
+        notes: milkIntake.notes,
+        createdAt: new Date().toISOString()
+      });
+
+      const farmer = farmers.find(f => f.id === milkIntake.farmerId);
+      alert(`Milk intake recorded!\n\nFarmer: ${farmer?.name}\nQuantity: ${milkIntake.quantity}L`);
+
+      setMilkIntake({
+        farmerId: '',
+        quantity: 0,
+        notes: ''
+      });
+
+      await refreshData();
+    } catch (error) {
+      console.error('Error recording milk intake:', error);
+      alert('Failed to record milk intake. Please try again.');
+    } finally {
+      setIsUpdating(null);
+    }
+  };
+
+  // Handle temporary delivery
+  const handleTemporaryDelivery = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!tempDelivery.customerName || !tempDelivery.customerPhone || tempDelivery.quantity <= 0) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    if (todayProgress.remaining < tempDelivery.quantity) {
+      alert(`Insufficient milk quantity!\n\nTrying to deliver: ${tempDelivery.quantity}L\nRemaining: ${todayProgress.remaining}L`);
+      return;
+    }
+
+    try {
+      setIsUpdating('temp-delivery');
+
+      const deliveryId = `temp_delivery_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      await addDelivery({
+        customerId: deliveryId,
+        customerName: tempDelivery.customerName,
+        deliveryPartnerId: partnerId,
+        supplierId: currentPartner?.supplierId || '',
+        quantity: tempDelivery.quantity,
+        suggestedQuantity: tempDelivery.quantity,
+        date: today,
+        status: 'completed',
+        scheduledTime: new Date().toISOString(),
+        completedTime: new Date().toISOString(),
+        notes: `TEMPORARY DELIVERY\nPhone: ${tempDelivery.customerPhone}\nAddress: ${tempDelivery.customerAddress}\nNotes: ${tempDelivery.notes}`
+      });
+
+      alert(`Temporary delivery recorded!\n\nCustomer: ${tempDelivery.customerName}\nQuantity: ${tempDelivery.quantity}L`);
+
+      setTempDelivery({
+        customerName: '',
+        customerPhone: '',
+        customerAddress: '',
+        quantity: 0,
+        notes: ''
+      });
+
+      await refreshData();
+    } catch (error) {
+      console.error('Error recording temporary delivery:', error);
+      alert('Failed to record temporary delivery. Please try again.');
+    } finally {
+      setIsUpdating(null);
+    }
   };
 
   // Calculate progress percentage
@@ -259,10 +417,10 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
         </div>
 
         {/* Navigation Tabs */}
-        <nav className="flex space-x-8 mb-8">
+        <nav className="flex space-x-8 mb-8 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -272,13 +430,43 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
           </button>
           <button
             onClick={() => setActiveTab('deliveries')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'deliveries'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
             }`}
           >
             Deliveries
+          </button>
+          <button
+            onClick={() => setActiveTab('add-customer')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'add-customer'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Add Customer
+          </button>
+          <button
+            onClick={() => setActiveTab('milk-intake')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'milk-intake'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Milk Intake
+          </button>
+          <button
+            onClick={() => setActiveTab('temp-delivery')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'temp-delivery'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Temp Delivery
           </button>
         </nav>
 
@@ -559,6 +747,357 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
                   })}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+
+        {/* Add Customer Tab */}
+        {activeTab === 'add-customer' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 bg-green-100 rounded-lg">
+                <UserPlus className="h-6 w-6 text-green-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Add New Customer</h3>
+                <p className="text-sm text-gray-500">Register a new customer for your supplier</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleAddCustomer} className="space-y-4 max-w-2xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={newCustomer.name}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, name: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter customer name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={newCustomer.email}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, email: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="customer@example.com"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={newCustomer.phone}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, phone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter phone number"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address <span className="text-red-500">*</span>
+                </label>
+                <textarea
+                  value={newCustomer.address}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, address: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter customer address"
+                  rows={3}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Daily Quantity (Liters)
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={newCustomer.dailyQuantity}
+                  onChange={(e) => setNewCustomer({ ...newCustomer, dailyQuantity: parseFloat(e.target.value) })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={isUpdating === 'adding-customer'}
+                  className="flex-1 bg-green-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isUpdating === 'adding-customer' ? 'Adding Customer...' : 'Add Customer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewCustomer({ name: '', email: '', phone: '', address: '', dailyQuantity: 1 })}
+                  className="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Clear Form
+                </button>
+              </div>
+            </form>
+          </div>
+        )}
+
+        {/* Milk Intake Tab */}
+        {activeTab === 'milk-intake' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Milk className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Record Milk Intake</h3>
+                <p className="text-sm text-gray-500">Log milk collected from farmers</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleRecordMilkIntake} className="space-y-4 max-w-2xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Select Farmer <span className="text-red-500">*</span>
+                </label>
+                <select
+                  value={milkIntake.farmerId}
+                  onChange={(e) => setMilkIntake({ ...milkIntake, farmerId: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  <option value="">Choose a farmer</option>
+                  {farmers
+                    .filter(f => f.supplierId === currentPartner?.supplierId)
+                    .map(farmer => (
+                      <option key={farmer.id} value={farmer.id}>
+                        {farmer.name} - {farmer.phone}
+                      </option>
+                    ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity (Liters) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={milkIntake.quantity || ''}
+                  onChange={(e) => setMilkIntake({ ...milkIntake, quantity: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Enter quantity in liters"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={milkIntake.notes}
+                  onChange={(e) => setMilkIntake({ ...milkIntake, notes: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Any additional notes (optional)"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={isUpdating === 'recording-intake'}
+                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isUpdating === 'recording-intake' ? 'Recording...' : 'Record Milk Intake'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMilkIntake({ farmerId: '', quantity: 0, notes: '' })}
+                  className="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Clear Form
+                </button>
+              </div>
+            </form>
+
+            {/* Recent Pickups */}
+            <div className="mt-8 pt-8 border-t">
+              <h4 className="font-semibold text-gray-900 mb-4">Today's Pickup Logs</h4>
+              <div className="space-y-3">
+                {pickupLogs
+                  .filter(log => log.deliveryPartnerId === partnerId && log.date === today)
+                  .map(log => {
+                    const farmer = farmers.find(f => f.id === log.farmerId);
+                    return (
+                      <div key={log.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div>
+                          <p className="font-medium text-gray-900">{farmer?.name || 'Unknown Farmer'}</p>
+                          <p className="text-sm text-gray-500">{log.notes}</p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600">{log.quantity}L</p>
+                          <p className="text-xs text-gray-500">{new Date(log.createdAt).toLocaleTimeString()}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {pickupLogs.filter(log => log.deliveryPartnerId === partnerId && log.date === today).length === 0 && (
+                  <p className="text-center text-gray-500 py-4">No pickup logs recorded today</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Temporary Delivery Tab */}
+        {activeTab === 'temp-delivery' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <Package className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Temporary Delivery</h3>
+                <p className="text-sm text-gray-500">Record one-time delivery to non-registered customer</p>
+              </div>
+            </div>
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> Temporary deliveries are for one-time customers.
+                The quantity will be deducted from your remaining allocation.
+                <br />
+                <strong>Remaining: {todayProgress.remaining}L</strong>
+              </p>
+            </div>
+
+            <form onSubmit={handleTemporaryDelivery} className="space-y-4 max-w-2xl">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Customer Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  value={tempDelivery.customerName}
+                  onChange={(e) => setTempDelivery({ ...tempDelivery, customerName: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter customer name"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Phone Number <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="tel"
+                  value={tempDelivery.customerPhone}
+                  onChange={(e) => setTempDelivery({ ...tempDelivery, customerPhone: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter phone number"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Address
+                </label>
+                <textarea
+                  value={tempDelivery.customerAddress}
+                  onChange={(e) => setTempDelivery({ ...tempDelivery, customerAddress: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter delivery address (optional)"
+                  rows={2}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Quantity (Liters) <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  step="0.5"
+                  min="0.5"
+                  value={tempDelivery.quantity || ''}
+                  onChange={(e) => setTempDelivery({ ...tempDelivery, quantity: parseFloat(e.target.value) || 0 })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Enter quantity in liters"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Notes
+                </label>
+                <textarea
+                  value={tempDelivery.notes}
+                  onChange={(e) => setTempDelivery({ ...tempDelivery, notes: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500"
+                  placeholder="Any additional notes (optional)"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex space-x-4 pt-4">
+                <button
+                  type="submit"
+                  disabled={isUpdating === 'temp-delivery'}
+                  className="flex-1 bg-orange-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-orange-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isUpdating === 'temp-delivery' ? 'Recording...' : 'Record Temporary Delivery'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTempDelivery({ customerName: '', customerPhone: '', customerAddress: '', quantity: 0, notes: '' })}
+                  className="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Clear Form
+                </button>
+              </div>
+            </form>
+
+            {/* Recent Temp Deliveries */}
+            <div className="mt-8 pt-8 border-t">
+              <h4 className="font-semibold text-gray-900 mb-4">Today's Temporary Deliveries</h4>
+              <div className="space-y-3">
+                {deliveries
+                  .filter(d => d.deliveryPartnerId === partnerId && d.date === today && d.id.startsWith('temp_delivery'))
+                  .map(delivery => (
+                    <div key={delivery.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                      <div>
+                        <p className="font-medium text-gray-900">{delivery.customerName}</p>
+                        <p className="text-sm text-gray-500">{delivery.notes?.split('\n')[1] || ''}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-lg font-bold text-orange-600">{delivery.quantity}L</p>
+                        <p className="text-xs text-gray-500">{delivery.completedTime ? new Date(delivery.completedTime).toLocaleTimeString() : ''}</p>
+                      </div>
+                    </div>
+                  ))}
+                {deliveries.filter(d => d.deliveryPartnerId === partnerId && d.date === today && d.id.startsWith('temp_delivery')).length === 0 && (
+                  <p className="text-center text-gray-500 py-4">No temporary deliveries recorded today</p>
+                )}
+              </div>
             </div>
           </div>
         )}
