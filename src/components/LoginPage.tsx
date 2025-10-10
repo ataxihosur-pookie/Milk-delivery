@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Milk, Eye, EyeOff, Users, Truck, ShoppingCart } from 'lucide-react';
+import { Milk, Eye, EyeOff, Users, Truck, ShoppingCart, Sprout } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import SupplierSignup from './SupplierSignup';
@@ -9,11 +9,11 @@ interface LoginPageProps {
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const { deliveryPartners, suppliers } = useData();
+  const { deliveryPartners, suppliers, farmers } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [userRole, setUserRole] = useState<'admin' | 'supplier' | 'delivery_partner' | 'customer'>('supplier');
+  const [userRole, setUserRole] = useState<'admin' | 'supplier' | 'delivery_partner' | 'customer' | 'farmer'>('supplier');
   const [showSignup, setShowSignup] = useState(false);
   const [error, setError] = useState('');
 
@@ -21,7 +21,24 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
     e.preventDefault();
     setError('');
 
-    if (userRole === 'delivery_partner') {
+    if (userRole === 'farmer') {
+      const farmer = farmers.find(f =>
+        f.phone === email && f.password === password
+      );
+
+      if (farmer) {
+        const user: User = {
+          id: farmer.userId,
+          name: farmer.name,
+          email: farmer.phone,
+          role: 'farmer',
+          supplierId: farmer.supplierId
+        };
+        onLogin(user);
+      } else {
+        setError('Invalid phone number or password.');
+      }
+    } else if (userRole === 'delivery_partner') {
       // For delivery partners, check against registered delivery partners
       const partner = deliveryPartners.find(dp =>
         dp.email === email && dp.password === password
@@ -140,8 +157,8 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               type="button"
               onClick={() => setUserRole('delivery_partner')}
               className={`flex-1 py-2 px-3 rounded-md text-sm font-medium flex items-center justify-center space-x-1 transition-colors ${
-                userRole === 'delivery_partner' 
-                  ? 'bg-blue-600 text-white' 
+                userRole === 'delivery_partner'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -150,10 +167,22 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             </button>
             <button
               type="button"
+              onClick={() => setUserRole('farmer')}
+              className={`flex-1 py-2 px-3 rounded-md text-sm font-medium flex items-center justify-center space-x-1 transition-colors ${
+                userRole === 'farmer'
+                  ? 'bg-blue-600 text-white'
+                  : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
+              }`}
+            >
+              <Sprout className="h-4 w-4" />
+              <span>Farmer</span>
+            </button>
+            <button
+              type="button"
               onClick={() => setUserRole('customer')}
               className={`flex-1 py-2 px-3 rounded-md text-sm font-medium flex items-center justify-center space-x-1 transition-colors ${
-                userRole === 'customer' 
-                  ? 'bg-blue-600 text-white' 
+                userRole === 'customer'
+                  ? 'bg-blue-600 text-white'
                   : 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50'
               }`}
             >
@@ -166,18 +195,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  {userRole === 'supplier' ? 'Username or Email' : userRole === 'delivery_partner' ? 'Email Address' : 'Email address'}
+                  {userRole === 'farmer' ? 'Phone Number' : userRole === 'supplier' ? 'Username or Email' : userRole === 'delivery_partner' ? 'Email Address' : 'Email address'}
                 </label>
                 <input
                   id="email"
                   name="email"
-                  type={userRole === 'supplier' ? 'text' : 'email'}
-                  autoComplete={userRole === 'supplier' ? 'username' : 'email'}
+                  type={userRole === 'farmer' ? 'tel' : userRole === 'supplier' ? 'text' : 'email'}
+                  autoComplete={userRole === 'farmer' ? 'tel' : userRole === 'supplier' ? 'username' : 'email'}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder={userRole === 'supplier' ? 'Enter username or email' : userRole === 'delivery_partner' ? 'Enter your email address' : 'Enter your email'}
+                  placeholder={userRole === 'farmer' ? 'Enter phone number' : userRole === 'supplier' ? 'Enter username or email' : userRole === 'delivery_partner' ? 'Enter your email address' : 'Enter your email'}
                 />
               </div>
               <div className="relative">

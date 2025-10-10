@@ -4,8 +4,8 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'supplier' | 'delivery_partner' | 'customer';
-  supplierId?: string; // For delivery partners and customers
+  role: 'admin' | 'supplier' | 'delivery_partner' | 'customer' | 'farmer';
+  supplierId?: string; // For delivery partners, customers, and farmers
   phone?: string;
   address?: string;
 }

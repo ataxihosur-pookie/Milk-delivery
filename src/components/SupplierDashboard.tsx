@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LogOut, Plus, Truck, Users, Package, Calendar } from 'lucide-react';
+import { LogOut, Plus, Truck, Users, Package, Calendar, Milk, UserPlus } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import AllocateMilk from './AllocateMilk';
@@ -12,7 +12,7 @@ interface SupplierDashboardProps {
 }
 
 const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout }) => {
-  const { deliveryPartners, customers, deliveries, suppliers, dailyAllocations, addDeliveryPartner, addCustomer, assignCustomersToPartner, refreshData } = useData();
+  const { deliveryPartners, customers, deliveries, suppliers, dailyAllocations, farmers, pickupLogs, addDeliveryPartner, addCustomer, addFarmer, addPickupLog, assignCustomersToPartner, refreshData } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [showAllocateMilk, setShowAllocateMilk] = useState(false);
@@ -29,17 +29,132 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // New farmer form state
+  const [newFarmer, setNewFarmer] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    address: '',
+    password: ''
+  });
+
+  // Milk intake form state
+  const [milkIntake, setMilkIntake] = useState({
+    farmerId: '',
+    quantity: 0,
+    qualityGrade: 'A' as 'A' | 'B' | 'C',
+    fatContent: 0,
+    pricePerLiter: 0,
+    notes: ''
+  });
+
   const supplier = suppliers.find(s => s.id === user.id || s.email === user.email);
   const supplierId = supplier?.id || user.id;
   const myDeliveryPartners = deliveryPartners.filter(dp => dp.supplierId === supplierId);
   const myCustomers = customers.filter(c => c.supplierId === supplierId);
   const myDeliveries = deliveries.filter(d => d.supplierId === supplierId);
   const myAllocations = dailyAllocations.filter(a => a.supplierId === supplierId);
+  const myFarmers = farmers.filter(f => f.supplierId === supplierId);
+  const myPickupLogs = pickupLogs.filter(p => p.supplierId === supplierId);
 
   const todayDeliveries = myDeliveries.filter(d => d.date === selectedDate);
   const todayAllocations = myAllocations.filter(a => a.date === selectedDate);
   const completedToday = todayDeliveries.filter(d => d.status === 'completed').length;
   const pendingToday = todayDeliveries.filter(d => d.status === 'pending').length;
+
+  // Handle add new farmer
+  const handleAddFarmer = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newFarmer.name || !newFarmer.phone || !newFarmer.password) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const userId = `farmer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      await addFarmer({
+        name: newFarmer.name,
+        email: newFarmer.email,
+        phone: newFarmer.phone,
+        address: newFarmer.address,
+        supplierId: supplierId,
+        userId: userId,
+        password: newFarmer.password,
+        status: 'active'
+      });
+
+      alert(`Farmer "${newFarmer.name}" added successfully!\n\nPhone: ${newFarmer.phone}\nPassword: ${newFarmer.password}`);
+
+      setNewFarmer({
+        name: '',
+        email: '',
+        phone: '',
+        address: '',
+        password: ''
+      });
+
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding farmer:', error);
+      alert('Failed to add farmer. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Handle record milk intake
+  const handleRecordMilkIntake = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!milkIntake.farmerId || milkIntake.quantity <= 0 || milkIntake.pricePerLiter <= 0) {
+      alert('Please select a farmer and enter valid quantity and price');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+
+      const totalAmount = milkIntake.quantity * milkIntake.pricePerLiter;
+
+      await addPickupLog({
+        farmerId: milkIntake.farmerId,
+        supplierId: supplierId,
+        quantity: milkIntake.quantity,
+        qualityGrade: milkIntake.qualityGrade,
+        fatContent: milkIntake.fatContent,
+        pricePerLiter: milkIntake.pricePerLiter,
+        totalAmount: totalAmount,
+        date: selectedDate,
+        pickupTime: new Date().toISOString(),
+        status: 'completed',
+        notes: milkIntake.notes,
+        createdAt: new Date().toISOString()
+      });
+
+      const farmer = myFarmers.find(f => f.id === milkIntake.farmerId);
+      alert(`Milk intake recorded!\n\nFarmer: ${farmer?.name}\nQuantity: ${milkIntake.quantity}L\nQuality: ${milkIntake.qualityGrade}\nPrice: ₹${milkIntake.pricePerLiter}/L\nTotal: ₹${totalAmount.toFixed(2)}`);
+
+      setMilkIntake({
+        farmerId: '',
+        quantity: 0,
+        qualityGrade: 'A',
+        fatContent: 0,
+        pricePerLiter: 0,
+        notes: ''
+      });
+
+      await refreshData();
+    } catch (error) {
+      console.error('Error recording milk intake:', error);
+      alert('Failed to record milk intake. Please try again.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   const handleNewCustomerSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -133,10 +248,10 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
       </header>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <nav className="flex space-x-8 mb-8">
+        <nav className="flex space-x-8 mb-8 overflow-x-auto">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'overview'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -146,7 +261,7 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
           </button>
           <button
             onClick={() => setActiveTab('delivery-partners')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'delivery-partners'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -156,7 +271,7 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
           </button>
           <button
             onClick={() => setActiveTab('customers')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'customers'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -165,8 +280,28 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
             Customers
           </button>
           <button
+            onClick={() => setActiveTab('farmers')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'farmers'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Farmers
+          </button>
+          <button
+            onClick={() => setActiveTab('milk-intake')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'milk-intake'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Milk Intake
+          </button>
+          <button
             onClick={() => setActiveTab('deliveries')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'deliveries'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -176,7 +311,7 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
           </button>
           <button
             onClick={() => setActiveTab('assignments')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'assignments'
                 ? 'border-blue-500 text-blue-600'
                 : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -493,6 +628,314 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
 
         {activeTab === 'assignments' && (
           <CustomerAssignment supplierId={supplierId} />
+        )}
+
+        {/* Farmers Tab */}
+        {activeTab === 'farmers' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-green-100 rounded-lg">
+                  <UserPlus className="h-6 w-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Farmer Management</h3>
+                  <p className="text-sm text-gray-500">Add and manage farmers</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Add Farmer Form */}
+            <form onSubmit={handleAddFarmer} className="mb-8 p-6 bg-gray-50 rounded-lg">
+              <h4 className="font-semibold text-gray-900 mb-4">Add New Farmer</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Farmer Name <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={newFarmer.name}
+                    onChange={(e) => setNewFarmer({ ...newFarmer, name: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter farmer name"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Phone Number <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="tel"
+                    value={newFarmer.phone}
+                    onChange={(e) => setNewFarmer({ ...newFarmer, phone: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Phone (used for login)"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Password <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="password"
+                    value={newFarmer.password}
+                    onChange={(e) => setNewFarmer({ ...newFarmer, password: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Login password"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={newFarmer.email}
+                    onChange={(e) => setNewFarmer({ ...newFarmer, email: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="farmer@example.com"
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Address
+                  </label>
+                  <textarea
+                    value={newFarmer.address}
+                    onChange={(e) => setNewFarmer({ ...newFarmer, address: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+                    placeholder="Enter farmer address"
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="mt-4 flex space-x-3">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSubmitting ? 'Adding...' : 'Add Farmer'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setNewFarmer({ name: '', email: '', phone: '', address: '', password: '' })}
+                  className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
+
+            {/* Farmers List */}
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Registered Farmers ({myFarmers.length})</h4>
+              <div className="space-y-3">
+                {myFarmers.map(farmer => (
+                  <div key={farmer.id} className="flex items-center justify-between p-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
+                    <div>
+                      <p className="font-medium text-gray-900">{farmer.name}</p>
+                      <p className="text-sm text-gray-500">Phone: {farmer.phone}</p>
+                      <p className="text-sm text-gray-500">{farmer.address}</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-flex px-3 py-1 rounded-full text-xs font-medium ${
+                        farmer.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {farmer.status}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {myFarmers.length === 0 && (
+                  <p className="text-center text-gray-500 py-8">No farmers registered yet</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Milk Intake Tab */}
+        {activeTab === 'milk-intake' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 bg-blue-100 rounded-lg">
+                <Milk className="h-6 w-6 text-blue-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Record Milk Intake</h3>
+                <p className="text-sm text-gray-500">Log milk collected from farmers with quality and pricing</p>
+              </div>
+            </div>
+
+            <form onSubmit={handleRecordMilkIntake} className="mb-8 space-y-4 max-w-3xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Farmer <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={milkIntake.farmerId}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, farmerId: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Choose a farmer</option>
+                    {myFarmers
+                      .filter(f => f.status === 'active')
+                      .map(farmer => (
+                        <option key={farmer.id} value={farmer.id}>
+                          {farmer.name} - {farmer.phone}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantity (Liters) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={milkIntake.quantity || ''}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, quantity: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter quantity"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quality Grade <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={milkIntake.qualityGrade}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, qualityGrade: e.target.value as 'A' | 'B' | 'C' })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="A">Grade A (Premium)</option>
+                    <option value="B">Grade B (Standard)</option>
+                    <option value="C">Grade C (Basic)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fat Content (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={milkIntake.fatContent || ''}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, fatContent: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Fat percentage"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price per Liter (₹) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={milkIntake.pricePerLiter || ''}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, pricePerLiter: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Price per liter"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total Amount (₹)
+                  </label>
+                  <input
+                    type="text"
+                    value={`₹${(milkIntake.quantity * milkIntake.pricePerLiter).toFixed(2)}`}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    disabled
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={milkIntake.notes}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, notes: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Additional notes (optional)"
+                    rows={2}
+                  />
+                </div>
+              </div>
+
+              <div className="flex space-x-3">
+                <button
+                  type="submit"
+                  disabled={isSubmitting}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isSubmitting ? 'Recording...' : 'Record Milk Intake'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setMilkIntake({ farmerId: '', quantity: 0, qualityGrade: 'A', fatContent: 0, pricePerLiter: 0, notes: '' })}
+                  className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                >
+                  Clear
+                </button>
+              </div>
+            </form>
+
+            {/* Today's Pickup Logs */}
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Today's Milk Collection ({myPickupLogs.filter(p => p.date === selectedDate).length})</h4>
+              <div className="space-y-3">
+                {myPickupLogs
+                  .filter(p => p.date === selectedDate)
+                  .map(log => {
+                    const farmer = myFarmers.find(f => f.id === log.farmerId);
+                    return (
+                      <div key={log.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+                        <div className="flex-1">
+                          <p className="font-medium text-gray-900">{farmer?.name || 'Unknown Farmer'}</p>
+                          <p className="text-sm text-gray-500">Quality: {log.qualityGrade} | Fat: {log.fatContent}% | {log.notes}</p>
+                        </div>
+                        <div className="text-right ml-4">
+                          <p className="text-lg font-bold text-blue-600">{log.quantity}L</p>
+                          <p className="text-sm text-gray-600">₹{log.pricePerLiter}/L</p>
+                          <p className="text-sm font-semibold text-green-600">₹{log.totalAmount.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                {myPickupLogs.filter(p => p.date === selectedDate).length === 0 && (
+                  <p className="text-center text-gray-500 py-8">No milk intake recorded today</p>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* New Customer Form Modal */}

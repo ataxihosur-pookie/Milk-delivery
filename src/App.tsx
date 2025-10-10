@@ -4,6 +4,7 @@ import AdminDashboard from './components/AdminDashboard';
 import SupplierDashboard from './components/SupplierDashboard';
 import DeliveryPartnerDashboard from './components/DeliveryPartnerDashboard';
 import CustomerPortal from './components/CustomerPortal';
+import FarmerDashboard from './components/FarmerDashboard';
 import { User, AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { useData } from './context/DataContext';
@@ -59,6 +60,8 @@ function AppContent() {
         return <SupplierDashboard user={currentUser} onLogout={handleLogout} />;
       case 'delivery_partner':
         return <DeliveryPartnerDashboard user={currentUser} onLogout={handleLogout} />;
+      case 'farmer':
+        return <FarmerDashboard user={currentUser} onLogout={handleLogout} />;
       case 'customer':
         return <CustomerPortal user={currentUser} onLogout={handleLogout} />;
       default:
