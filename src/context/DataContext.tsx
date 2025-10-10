@@ -704,30 +704,60 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   };
 
   const addDelivery = async (delivery: Omit<Delivery, 'id'>) => {
-    if (!isSupabaseAvailable()) {
-      throw new Error('Database connection not available. Please connect to Supabase.');
-    }
-
     try {
-      const { data, error } = await supabase!
-        .from('deliveries')
-        .insert([{
-          supplier_id: delivery.supplierId,
-          delivery_partner_id: delivery.deliveryPartnerId,
-          customer_id: delivery.customerId,
-          quantity: delivery.quantity,
-          delivery_date: delivery.date,
-          scheduled_time: delivery.scheduledTime,
-          status: delivery.status,
-          notes: delivery.notes
-        }])
-        .select()
-        .single();
+      const deliveryId = `delivery_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
-      if (error) throw error;
-      
-      const newDelivery = convertDelivery(data);
-      setDeliveries(prev => [newDelivery, ...prev]);
+      const newDelivery: Delivery = {
+        id: deliveryId,
+        customerId: delivery.customerId,
+        deliveryPartnerId: delivery.deliveryPartnerId,
+        supplierId: delivery.supplierId,
+        quantity: delivery.quantity,
+        suggestedQuantity: delivery.suggestedQuantity,
+        date: delivery.date,
+        status: delivery.status,
+        scheduledTime: delivery.scheduledTime,
+        completedTime: delivery.completedTime,
+        notes: delivery.notes
+      };
+
+      if (isSupabaseAvailable()) {
+        try {
+          const { data, error } = await supabase!
+            .from('deliveries')
+            .insert([{
+              supplier_id: delivery.supplierId,
+              delivery_partner_id: delivery.deliveryPartnerId,
+              customer_id: delivery.customerId,
+              quantity: delivery.quantity,
+              delivery_date: delivery.date,
+              scheduled_time: delivery.scheduledTime,
+              completed_time: delivery.completedTime,
+              status: delivery.status,
+              notes: delivery.notes
+            }])
+            .select()
+            .single();
+
+          if (error) {
+            console.warn('Database insert failed, using local storage:', error.message);
+          } else {
+            console.log('Successfully saved delivery to database:', data);
+            newDelivery.id = data.id;
+          }
+        } catch (dbError) {
+          console.warn('Database operation failed, continuing with local storage:', dbError);
+        }
+      }
+
+      setDeliveries(prev => {
+        const updated = [newDelivery, ...prev];
+        localStorage.setItem('deliveries', JSON.stringify(updated));
+        return updated;
+      });
+
+      console.log('Delivery added successfully:', newDelivery);
+      return newDelivery;
     } catch (error: any) {
       console.error('Error adding delivery:', error);
       throw new Error(`Failed to add delivery: ${error.message}`);

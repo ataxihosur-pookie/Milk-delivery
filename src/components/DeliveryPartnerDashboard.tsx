@@ -9,7 +9,7 @@ interface DeliveryPartnerDashboardProps {
 }
 
 const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ user, onLogout }) => {
-  const { deliveries, customers, dailyAllocations, deliveryPartners, updateDeliveryStatus, refreshData, addCustomer, addPickupLog, addDelivery, pickupLogs, farmers } = useData();
+  const { deliveries, customers, dailyAllocations, deliveryPartners, updateDeliveryStatus, refreshData, addCustomer, addPickupLog, addDelivery, addDailyAllocation, pickupLogs, farmers } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [isUpdating, setIsUpdating] = useState<string | null>(null);
   const [editingQuantity, setEditingQuantity] = useState<{[customerId: string]: number}>({});
@@ -58,13 +58,19 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
   // Calculate today's progress
   useEffect(() => {
     const calculateProgress = () => {
-      // Get today's allocation from supplier
-      const todayAllocation = dailyAllocations.find(allocation => 
+      // Get all today's allocations and find the most recent one
+      const todayAllocations = dailyAllocations.filter(allocation =>
         allocation.deliveryPartnerId === partnerId && allocation.date === today
       );
 
+      const todayAllocation = todayAllocations.length > 0
+        ? todayAllocations.reduce((latest, current) =>
+            new Date(current.createdAt || 0) > new Date(latest.createdAt || 0) ? current : latest
+          )
+        : null;
+
       // Get today's deliveries for this partner
-      const todayDeliveries = deliveries.filter(d => 
+      const todayDeliveries = deliveries.filter(d =>
         d.deliveryPartnerId === partnerId && d.date === today
       );
 
@@ -284,8 +290,30 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
         createdAt: new Date().toISOString()
       });
 
+      const todayAllocations = dailyAllocations.filter(
+        a => a.deliveryPartnerId === partnerId && a.date === today
+      );
+
+      const existingAllocation = todayAllocations.length > 0
+        ? todayAllocations.reduce((latest, current) =>
+            new Date(current.createdAt || 0) > new Date(latest.createdAt || 0) ? current : latest
+          )
+        : null;
+
+      const newAllocated = (existingAllocation?.allocatedQuantity || 0) + milkIntake.quantity;
+      const newRemaining = (existingAllocation?.remainingQuantity || 0) + milkIntake.quantity;
+
+      await addDailyAllocation({
+        supplierId: currentPartner?.supplierId || '',
+        deliveryPartnerId: partnerId,
+        date: today,
+        allocatedQuantity: newAllocated,
+        remainingQuantity: newRemaining,
+        status: 'allocated'
+      });
+
       const farmer = farmers.find(f => f.id === milkIntake.farmerId);
-      alert(`Milk intake recorded!\n\nFarmer: ${farmer?.name}\nQuantity: ${milkIntake.quantity}L`);
+      alert(`Milk intake recorded!\n\nFarmer: ${farmer?.name}\nQuantity: ${milkIntake.quantity}L\n\nYour allocated milk has been increased by ${milkIntake.quantity}L`);
 
       setMilkIntake({
         farmerId: '',
