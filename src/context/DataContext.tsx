@@ -30,6 +30,7 @@ export interface Customer {
   address: string;
   supplierId: string;
   dailyQuantity: number;
+  status?: 'active' | 'paused';
   routeId?: string;
 }
 
@@ -133,6 +134,10 @@ interface DataContextType {
   assignRouteToPartner: (routeId: string, partnerId: string) => Promise<void>;
   updateDeliveryStatus: (deliveryId: string, status: 'pending' | 'completed' | 'cancelled', notes?: string, quantity?: number) => Promise<void>;
   updateDeliveryQuantity: (deliveryId: string, quantity: number) => Promise<void>;
+  updateCustomerStatus: (customerId: string, status: 'active' | 'paused') => Promise<void>;
+  deleteCustomer: (customerId: string) => Promise<void>;
+  updateDeliveryPartnerStatus: (partnerId: string, status: 'active' | 'paused') => Promise<void>;
+  deleteDeliveryPartner: (partnerId: string) => Promise<void>;
   logPickup: (farmerId: string, deliveryPartnerId: string, routeId: string, quantity: number, notes?: string) => Promise<void>;
   getDailyAllocation: (partnerId: string, date: string) => DailyAllocation | undefined;
   getPartnerRoute: (partnerId: string) => Route | undefined;
@@ -167,6 +172,10 @@ const DataContext = createContext<DataContextType>({
   assignRouteToPartner: async () => {},
   updateDeliveryStatus: async () => {},
   updateDeliveryQuantity: async () => {},
+  updateCustomerStatus: async () => {},
+  deleteCustomer: async () => {},
+  updateDeliveryPartnerStatus: async () => {},
+  deleteDeliveryPartner: async () => {},
   logPickup: async () => {},
   getDailyAllocation: () => undefined,
   getPartnerRoute: () => undefined,
@@ -1236,6 +1245,130 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     return suppliers.filter(supplier => supplier.status === 'pending');
   };
 
+  const updateCustomerStatus = async (customerId: string, status: 'active' | 'paused') => {
+    try {
+      if (isSupabaseAvailable()) {
+        try {
+          const { error } = await supabase!
+            .from('customers')
+            .update({ status })
+            .eq('id', customerId);
+
+          if (error) {
+            console.warn('Database update failed, using local storage:', error.message);
+          }
+        } catch (dbError) {
+          console.warn('Database operation failed, continuing with local storage:', dbError);
+        }
+      }
+
+      setCustomers(prev => {
+        const updated = prev.map(customer =>
+          customer.id === customerId
+            ? { ...customer, status }
+            : customer
+        );
+        localStorage.setItem('customers', JSON.stringify(updated));
+        return updated;
+      });
+
+      console.log(`Customer ${customerId} status updated to ${status}`);
+    } catch (error: any) {
+      console.error('Error updating customer status:', error);
+    }
+  };
+
+  const deleteCustomer = async (customerId: string) => {
+    try {
+      if (isSupabaseAvailable()) {
+        try {
+          const { error } = await supabase!
+            .from('customers')
+            .delete()
+            .eq('id', customerId);
+
+          if (error) {
+            console.warn('Database delete failed, using local storage:', error.message);
+          }
+        } catch (dbError) {
+          console.warn('Database operation failed, continuing with local storage:', dbError);
+        }
+      }
+
+      setCustomers(prev => {
+        const updated = prev.filter(customer => customer.id !== customerId);
+        localStorage.setItem('customers', JSON.stringify(updated));
+        return updated;
+      });
+
+      console.log(`Customer ${customerId} deleted`);
+    } catch (error: any) {
+      console.error('Error deleting customer:', error);
+    }
+  };
+
+  const updateDeliveryPartnerStatus = async (partnerId: string, status: 'active' | 'paused') => {
+    try {
+      if (isSupabaseAvailable()) {
+        try {
+          const { error } = await supabase!
+            .from('delivery_partners')
+            .update({ status: status === 'active' ? 'active' : 'inactive' })
+            .eq('id', partnerId);
+
+          if (error) {
+            console.warn('Database update failed, using local storage:', error.message);
+          }
+        } catch (dbError) {
+          console.warn('Database operation failed, continuing with local storage:', dbError);
+        }
+      }
+
+      setDeliveryPartners(prev => {
+        const updated = prev.map(partner =>
+          partner.id === partnerId
+            ? { ...partner, status: status === 'active' ? 'active' : 'inactive' }
+            : partner
+        );
+        localStorage.setItem('deliveryPartners', JSON.stringify(updated));
+        return updated;
+      });
+
+      console.log(`Delivery Partner ${partnerId} status updated to ${status}`);
+    } catch (error: any) {
+      console.error('Error updating delivery partner status:', error);
+    }
+  };
+
+  const deleteDeliveryPartner = async (partnerId: string) => {
+    try {
+      if (isSupabaseAvailable()) {
+        try {
+          const { error } = await supabase!
+            .from('delivery_partners')
+            .delete()
+            .eq('id', partnerId);
+
+          if (error) {
+            console.warn('Database delete failed, using local storage:', error.message);
+          }
+        } catch (dbError) {
+          console.warn('Database operation failed, continuing with local storage:', dbError);
+        }
+      }
+
+      setDeliveryPartners(prev => {
+        const updated = prev.filter(partner => partner.id !== partnerId);
+        localStorage.setItem('deliveryPartners', JSON.stringify(updated));
+        return updated;
+      });
+
+      console.log(`Delivery Partner ${partnerId} deleted`);
+    } catch (error: any) {
+      console.error('Error deleting delivery partner:', error);
+    }
+  };
+
   const addFarmer = async (farmer: Omit<Farmer, 'id'>) => {
     try {
       const farmerId = `farmer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -1451,6 +1584,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       assignRouteToPartner,
       updateDeliveryStatus,
       updateDeliveryQuantity,
+      updateCustomerStatus,
+      deleteCustomer,
+      updateDeliveryPartnerStatus,
+      deleteDeliveryPartner,
       logPickup,
       getDailyAllocation,
       getPartnerRoute,

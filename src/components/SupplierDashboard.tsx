@@ -12,12 +12,14 @@ interface SupplierDashboardProps {
 }
 
 const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout }) => {
-  const { deliveryPartners, customers, deliveries, suppliers, dailyAllocations, farmers, pickupLogs, addDeliveryPartner, addCustomer, addFarmer, addPickupLog, assignCustomersToPartner, refreshData } = useData();
+  const { deliveryPartners, customers, deliveries, suppliers, dailyAllocations, farmers, pickupLogs, addDeliveryPartner, addCustomer, addFarmer, addPickupLog, assignCustomersToPartner, updateCustomerStatus, deleteCustomer, updateDeliveryPartnerStatus, deleteDeliveryPartner, refreshData } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
   const [showAllocateMilk, setShowAllocateMilk] = useState(false);
   const [showAddPartner, setShowAddPartner] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [downloadStartDate, setDownloadStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [downloadEndDate, setDownloadEndDate] = useState(new Date().toISOString().split('T')[0]);
   const [newCustomerData, setNewCustomerData] = useState({
     name: '',
     email: '',
@@ -223,6 +225,131 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handleToggleCustomerStatus = async (customerId: string, newStatus: 'active' | 'paused') => {
+    try {
+      await updateCustomerStatus(customerId, newStatus);
+      await refreshData();
+      alert(`Customer ${newStatus === 'paused' ? 'paused' : 'activated'} successfully!`);
+    } catch (error) {
+      console.error('Error updating customer status:', error);
+      alert('Failed to update customer status');
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string, customerName: string) => {
+    if (!confirm(`Are you sure you want to delete customer "${customerName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteCustomer(customerId);
+      await refreshData();
+      alert('Customer deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting customer:', error);
+      alert('Failed to delete customer');
+    }
+  };
+
+  const handleTogglePartnerStatus = async (partnerId: string, newStatus: 'active' | 'paused') => {
+    try {
+      await updateDeliveryPartnerStatus(partnerId, newStatus);
+      await refreshData();
+      alert(`Delivery partner ${newStatus === 'paused' ? 'paused' : 'activated'} successfully!`);
+    } catch (error) {
+      console.error('Error updating partner status:', error);
+      alert('Failed to update partner status');
+    }
+  };
+
+  const handleDeletePartner = async (partnerId: string, partnerName: string) => {
+    if (!confirm(`Are you sure you want to delete delivery partner "${partnerName}"? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      await deleteDeliveryPartner(partnerId);
+      await refreshData();
+      alert('Delivery partner deleted successfully!');
+    } catch (error) {
+      console.error('Error deleting delivery partner:', error);
+      alert('Failed to delete delivery partner');
+    }
+  };
+
+  const downloadCSV = (data: string[][], filename: string) => {
+    const csv = data.map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleDownloadDeliveries = () => {
+    const filteredDeliveries = myDeliveries.filter(d => {
+      const deliveryDate = new Date(d.date).toISOString().split('T')[0];
+      return deliveryDate >= downloadStartDate && deliveryDate <= downloadEndDate;
+    });
+
+    if (filteredDeliveries.length === 0) {
+      alert('No deliveries found for the selected date range');
+      return;
+    }
+
+    const headers = ['Date', 'Customer', 'Delivery Partner', 'Quantity (L)', 'Status', 'Notes'];
+    const rows = filteredDeliveries.map(d => {
+      const customer = myCustomers.find(c => c.id === d.customerId);
+      const partner = myDeliveryPartners.find(p => p.id === d.deliveryPartnerId);
+      return [
+        new Date(d.date).toLocaleDateString(),
+        customer?.name || 'Unknown',
+        partner?.name || 'Unknown',
+        d.quantity.toString(),
+        d.status,
+        d.notes || ''
+      ];
+    });
+
+    downloadCSV([headers, ...rows], `deliveries_${downloadStartDate}_to_${downloadEndDate}.csv`);
+    alert(`Downloaded ${filteredDeliveries.length} delivery records`);
+  };
+
+  const handleDownloadMilkIntake = () => {
+    const filteredPickups = myPickupLogs.filter(p => {
+      const pickupDate = new Date(p.date).toISOString().split('T')[0];
+      return pickupDate >= downloadStartDate && pickupDate <= downloadEndDate;
+    });
+
+    if (filteredPickups.length === 0) {
+      alert('No milk intake records found for the selected date range');
+      return;
+    }
+
+    const headers = ['Date', 'Farmer', 'Delivery Partner', 'Quantity (L)', 'Quality', 'Fat %', 'Price/L', 'Total Amount', 'Status', 'Notes'];
+    const rows = filteredPickups.map(p => {
+      const farmer = farmers.find(f => f.id === p.farmerId);
+      const partner = myDeliveryPartners.find(dp => dp.id === p.deliveryPartnerId);
+      return [
+        new Date(p.date).toLocaleDateString(),
+        farmer?.name || 'Unknown',
+        partner?.name || 'Unknown',
+        p.quantity.toString(),
+        p.qualityGrade,
+        p.fatContent.toString(),
+        p.pricePerLiter.toString(),
+        p.totalAmount.toFixed(2),
+        p.status,
+        p.notes || ''
+      ];
+    });
+
+    downloadCSV([headers, ...rows], `milk_intake_${downloadStartDate}_to_${downloadEndDate}.csv`);
+    alert(`Downloaded ${filteredPickups.length} milk intake records`);
   };
 
   return (
@@ -474,6 +601,9 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Status
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -496,12 +626,32 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          partner.status === 'active' 
-                            ? 'bg-green-100 text-green-800' 
-                            : 'bg-red-100 text-red-800'
+                          partner.status === 'active'
+                            ? 'bg-green-100 text-green-800'
+                            : 'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {partner.status}
+                          {partner.status === 'active' ? 'Active' : 'Paused'}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleTogglePartnerStatus(partner.id, partner.status === 'active' ? 'paused' : 'active')}
+                            className={`px-3 py-1 rounded text-xs font-medium ${
+                              partner.status === 'active'
+                                ? 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                                : 'bg-green-100 text-green-700 hover:bg-green-200'
+                            }`}
+                          >
+                            {partner.status === 'active' ? 'Pause' : 'Activate'}
+                          </button>
+                          <button
+                            onClick={() => handleDeletePartner(partner.id, partner.name)}
+                            className="px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -544,6 +694,12 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Daily Qty
                     </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
@@ -566,6 +722,35 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {customer.dailyQuantity}L
                       </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          (customer as any).status === 'paused'
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-green-100 text-green-800'
+                        }`}>
+                          {(customer as any).status === 'paused' ? 'Paused' : 'Active'}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
+                          <button
+                            onClick={() => handleToggleCustomerStatus(customer.id, (customer as any).status === 'paused' ? 'active' : 'paused')}
+                            className={`px-3 py-1 rounded text-xs font-medium ${
+                              (customer as any).status === 'paused'
+                                ? 'bg-green-100 text-green-700 hover:bg-green-200'
+                                : 'bg-yellow-100 text-yellow-700 hover:bg-yellow-200'
+                            }`}
+                          >
+                            {(customer as any).status === 'paused' ? 'Activate' : 'Pause'}
+                          </button>
+                          <button
+                            onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+                            className="px-3 py-1 bg-red-100 text-red-700 hover:bg-red-200 rounded text-xs font-medium"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -577,7 +762,36 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
         {activeTab === 'deliveries' && (
           <div className="bg-white rounded-lg shadow-sm">
             <div className="p-6 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">All Deliveries</h3>
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-medium text-gray-900">All Deliveries</h3>
+              </div>
+              <div className="flex items-center space-x-4">
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">From:</label>
+                  <input
+                    type="date"
+                    value={downloadStartDate}
+                    onChange={(e) => setDownloadStartDate(e.target.value)}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <div className="flex items-center space-x-2">
+                  <label className="text-sm font-medium text-gray-700">To:</label>
+                  <input
+                    type="date"
+                    value={downloadEndDate}
+                    onChange={(e) => setDownloadEndDate(e.target.value)}
+                    className="px-3 py-1 border border-gray-300 rounded-md text-sm"
+                  />
+                </div>
+                <button
+                  onClick={handleDownloadDeliveries}
+                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  <Package className="h-4 w-4" />
+                  <span>Download CSV</span>
+                </button>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -847,13 +1061,37 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
         {/* Milk Intake Tab */}
         {activeTab === 'milk-intake' && (
           <div className="bg-white rounded-lg shadow-sm p-6">
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <Milk className="h-6 w-6 text-blue-600" />
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-3 bg-blue-100 rounded-lg">
+                  <Milk className="h-6 w-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Record Milk Intake</h3>
+                  <p className="text-sm text-gray-500">Log milk collected from farmers with quality and pricing</p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-lg font-medium text-gray-900">Record Milk Intake</h3>
-                <p className="text-sm text-gray-500">Log milk collected from farmers with quality and pricing</p>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="date"
+                  value={downloadStartDate}
+                  onChange={(e) => setDownloadStartDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+                <span className="text-gray-500">to</span>
+                <input
+                  type="date"
+                  value={downloadEndDate}
+                  onChange={(e) => setDownloadEndDate(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-md text-sm"
+                />
+                <button
+                  onClick={handleDownloadMilkIntake}
+                  className="flex items-center space-x-2 bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors text-sm font-medium"
+                >
+                  <Milk className="h-4 w-4" />
+                  <span>Download CSV</span>
+                </button>
               </div>
             </div>
 
