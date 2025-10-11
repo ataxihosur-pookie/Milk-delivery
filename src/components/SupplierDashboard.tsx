@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X, Truck, Users, Package, Calendar, Milk, ShoppingBag, Newspaper, DollarSign, UserPlus, FileText, PackageOpen } from 'lucide-react';
+import { LogOut, Menu, X, Truck, Users, Package, Calendar, Milk, ShoppingBag, Newspaper, DollarSign, UserPlus, FileText, PackageOpen, Droplets } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import AllocateMilk from './AllocateMilk';
@@ -12,6 +12,8 @@ import SupplierOrders from './SupplierOrders';
 import SupplierUpdates from './SupplierUpdates';
 import AddCustomer from './AddCustomer';
 import FarmerManagement from './FarmerManagement';
+import MilkIntake from './MilkIntake';
+import DeliveryManagement from './DeliveryManagement';
 
 interface SupplierDashboardProps {
   user: User;
@@ -43,6 +45,7 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
     { id: 'delivery-partners', label: 'Delivery Partners', icon: Truck },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'farmers', label: 'Farmers', icon: UserPlus },
+    { id: 'milk-intake', label: 'Milk Intake', icon: Droplets },
     { id: 'milk-allocation', label: 'Milk Allocation', icon: Milk },
     { id: 'deliveries', label: 'Deliveries', icon: Calendar },
     { id: 'temporary-deliveries', label: 'Temporary Deliveries', icon: PackageOpen },
@@ -69,6 +72,8 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
         return <AddCustomer supplierId={supplierId} />;
       case 'farmers':
         return <FarmerManagement supplierId={supplierId} />;
+      case 'milk-intake':
+        return <MilkIntake supplierId={supplierId} />;
       case 'customer-assignment':
         return <CustomerAssignment supplierId={supplierId} />;
       case 'milk-allocation':
@@ -76,32 +81,7 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
       case 'pricing':
         return <SupplierPricing supplierId={supplierId} />;
       case 'deliveries':
-        return (
-          <div className="p-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Deliveries</h2>
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Total Deliveries</p>
-                  <p className="text-2xl font-bold text-blue-600">{myDeliveries.length}</p>
-                </div>
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Completed</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {myDeliveries.filter(d => d.status === 'completed').length}
-                  </p>
-                </div>
-                <div className="bg-yellow-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Pending</p>
-                  <p className="text-2xl font-bold text-yellow-600">
-                    {myDeliveries.filter(d => d.status === 'pending').length}
-                  </p>
-                </div>
-              </div>
-              <p className="text-gray-500 text-center">Full delivery management coming soon</p>
-            </div>
-          </div>
-        );
+        return <DeliveryManagement supplierId={supplierId} />;
       case 'temporary-deliveries':
         return (
           <div className="p-4">
