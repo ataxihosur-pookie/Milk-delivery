@@ -1,9 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, Building2, BarChart3, Settings, Plus } from 'lucide-react';
+import { LogOut, Users, Building2, Truck, UserCheck, Package, Search, Ban, Trash2, CheckCircle, XCircle, Eye, Menu, X as XIcon } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
-import SupplierSignup from './SupplierSignup';
 
 interface AdminDashboardProps {
   user: User;
@@ -12,314 +11,628 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   const navigate = useNavigate();
+  const { suppliers, deliveryPartners, customers, farmers, deliveries, updateSupplierStatus, deleteCustomer, deleteDeliveryPartner } = useData();
+  const [activeTab, setActiveTab] = useState('overview');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
 
   const handleLogout = () => {
     onLogout();
     navigate('/admin/login');
   };
-  const { suppliers, deliveryPartners, customers, deliveries, updateSupplierStatus, getPendingSuppliers } = useData();
-  const [activeTab, setActiveTab] = useState('overview');
-  const [showAddSupplier, setShowAddSupplier] = useState(false);
+
+  const handleSupplierAction = async (supplierId: string, action: 'approved' | 'rejected') => {
+    if (window.confirm(`Are you sure you want to ${action === 'approved' ? 'approve' : 'reject'} this supplier?`)) {
+      await updateSupplierStatus(supplierId, action);
+    }
+  };
+
+  const handleDeleteCustomer = async (customerId: string, customerName: string) => {
+    if (window.confirm(`Are you sure you want to delete customer "${customerName}"? This action cannot be undone.`)) {
+      await deleteCustomer(customerId);
+    }
+  };
+
+  const handleDeleteDeliveryPartner = async (partnerId: string, partnerName: string) => {
+    if (window.confirm(`Are you sure you want to delete delivery partner "${partnerName}"? This action cannot be undone.`)) {
+      await deleteDeliveryPartner(partnerId);
+    }
+  };
 
   const stats = {
     totalSuppliers: suppliers.length,
+    activeSuppliers: suppliers.filter(s => s.status === 'approved').length,
+    pendingSuppliers: suppliers.filter(s => s.status === 'pending').length,
     totalDeliveryPartners: deliveryPartners.length,
     totalCustomers: customers.length,
+    totalFarmers: farmers.length,
     totalDeliveries: deliveries.length,
     completedDeliveries: deliveries.filter(d => d.status === 'completed').length,
     pendingDeliveries: deliveries.filter(d => d.status === 'pending').length
   };
 
-  if (showAddSupplier) {
-    return <SupplierSignup onBack={() => setShowAddSupplier(false)} onSignupSuccess={() => setShowAddSupplier(false)} />;
-  }
+  const menuItems = [
+    { id: 'overview', label: 'Overview', icon: Package },
+    { id: 'suppliers', label: 'Suppliers', icon: Building2 },
+    { id: 'delivery-partners', label: 'Delivery Partners', icon: Truck },
+    { id: 'customers', label: 'Customers', icon: Users },
+    { id: 'farmers', label: 'Farmers', icon: UserCheck }
+  ];
 
-  return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center">
-              <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+  const renderOverview = () => (
+    <div>
+      <h2 className="text-2xl font-bold text-gray-900 mb-6">System Overview</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center justify-between mb-4">
+            <div className="p-3 rounded-md bg-blue-50">
+              <Building2 className="h-6 w-6 text-blue-600" />
             </div>
-            <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-500">Welcome, {user.name}</span>
-              <button
-                onClick={handleLogout}
-                className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
-              >
-                <LogOut className="h-5 w-5" />
-                <span>Logout</span>
-              </button>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Total Suppliers</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalSuppliers}</p>
+            </div>
+          </div>
+          <div className="flex justify-between text-sm">
+            <span className="text-green-600">Active: {stats.activeSuppliers}</span>
+            <span className="text-yellow-600">Pending: {stats.pendingSuppliers}</span>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="p-3 rounded-md bg-green-50">
+              <Truck className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Delivery Partners</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalDeliveryPartners}</p>
             </div>
           </div>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <nav className="flex space-x-8 mb-8">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'overview'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Overview
-          </button>
-          <button
-            onClick={() => setActiveTab('suppliers')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'suppliers'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Suppliers
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors ${
-              activeTab === 'analytics'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            Analytics
-          </button>
-        </nav>
-
-        {activeTab === 'overview' && (
-          <div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-md bg-blue-50">
-                    <Building2 className="h-6 w-6 text-blue-600" />
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{stats.totalSuppliers}</h3>
-                    <p className="text-sm text-gray-500">Total Suppliers</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-md bg-green-50">
-                    <Users className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{stats.totalDeliveryPartners}</h3>
-                    <p className="text-sm text-gray-500">Delivery Partners</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-md bg-yellow-50">
-                    <Users className="h-6 w-6 text-yellow-600" />
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{stats.totalCustomers}</h3>
-                    <p className="text-sm text-gray-500">Customers</p>
-                  </div>
-                </div>
-              </div>
-
-              <div className="bg-white p-6 rounded-lg shadow-sm">
-                <div className="flex items-center">
-                  <div className="p-3 rounded-md bg-purple-50">
-                    <BarChart3 className="h-6 w-6 text-purple-600" />
-                  </div>
-                  <div className="ml-4">
-                    <h3 className="text-lg font-medium text-gray-900">{stats.completedDeliveries}/{stats.totalDeliveries}</h3>
-                    <p className="text-sm text-gray-500">Completed Deliveries</p>
-                  </div>
-                </div>
-              </div>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="p-3 rounded-md bg-purple-50">
+              <Users className="h-6 w-6 text-purple-600" />
             </div>
-
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Recent Activity</h3>
-              <div className="space-y-3">
-                {suppliers.map((supplier) => (
-                  <div key={supplier.id} className="flex items-center justify-between py-2">
-                    <div className="flex items-center">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-700">{supplier.name} registered as a supplier</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Active</span>
-                  </div>
-                ))}
-                {deliveryPartners.map((partner) => (
-                  <div key={partner.id} className="flex items-center justify-between py-2">
-                    <div className="flex items-center">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full mr-3"></div>
-                      <span className="text-sm text-gray-700">{partner.name} joined as delivery partner</span>
-                    </div>
-                    <span className="text-xs text-gray-500">Active</span>
-                  </div>
-                ))}
-              </div>
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Customers</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalCustomers}</p>
             </div>
           </div>
-        )}
+        </div>
 
-        {activeTab === 'suppliers' && (
-          <div className="bg-white rounded-lg shadow-sm">
-            <div className="p-6 border-b border-gray-200">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-medium text-gray-900">Suppliers</h3>
-                <button 
-                  onClick={() => setShowAddSupplier(true)}
-                  className="flex items-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  <Plus className="h-4 w-4" />
-                  <span>Add Supplier</span>
-                </button>
-              </div>
+        <div className="bg-white p-6 rounded-lg shadow-md">
+          <div className="flex items-center justify-between">
+            <div className="p-3 rounded-md bg-orange-50">
+              <UserCheck className="h-6 w-6 text-orange-600" />
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Phone
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Address
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      License Number
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Capacity
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Registration Date
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {suppliers.map((supplier) => (
-                    <tr key={supplier.id}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {supplier.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {supplier.email}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {supplier.phone}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 max-w-xs truncate">
-                        {supplier.address}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {supplier.licenseNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {supplier.totalCapacity}L/day
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Farmers</p>
+              <p className="text-3xl font-bold text-gray-900">{stats.totalFarmers}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow-md p-6">
+        <h3 className="text-lg font-semibold text-gray-900 mb-4">Recent Activity</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div>
+              <p className="font-medium text-gray-900">Total Deliveries</p>
+              <p className="text-sm text-gray-500">{stats.totalDeliveries} deliveries recorded</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm text-green-600">Completed: {stats.completedDeliveries}</p>
+              <p className="text-sm text-yellow-600">Pending: {stats.pendingDeliveries}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderSuppliers = () => {
+    const filteredSuppliers = suppliers.filter(s =>
+      s.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      s.phone.includes(searchTerm)
+    );
+
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Suppliers Management</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search suppliers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          {filteredSuppliers.map(supplier => (
+            <div key={supplier.id} className="bg-white rounded-lg shadow-md p-6">
+              <div className="flex justify-between items-start">
+                <div className="flex-1">
+                  <div className="flex items-center space-x-3 mb-3">
+                    <h3 className="text-xl font-semibold text-gray-900">{supplier.name}</h3>
+                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
+                      supplier.status === 'approved' ? 'bg-green-100 text-green-800' :
+                      supplier.status === 'rejected' ? 'bg-red-100 text-red-800' :
+                      'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {supplier.status.toUpperCase()}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-gray-500">Email</p>
+                      <p className="font-medium text-gray-900">{supplier.email}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Phone</p>
+                      <p className="font-medium text-gray-900">{supplier.phone}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Address</p>
+                      <p className="font-medium text-gray-900">{supplier.address}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">License Number</p>
+                      <p className="font-medium text-gray-900">{supplier.licenseNumber}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Total Capacity</p>
+                      <p className="font-medium text-gray-900">{supplier.totalCapacity} L/day</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-500">Registration Date</p>
+                      <p className="font-medium text-gray-900">
                         {new Date(supplier.registrationDate).toLocaleDateString()}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          supplier.status === 'approved' 
-                            ? 'bg-green-100 text-green-800'
-                            : supplier.status === 'pending'
-                            ? 'bg-yellow-100 text-yellow-800'
-                            : 'bg-red-100 text-red-800'
-                        }`}>
-                          {supplier.status}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        {supplier.status === 'pending' && (
-                          <div className="flex space-x-2">
-                            <button
-                              onClick={() => updateSupplierStatus(supplier.id, 'approved')}
-                              className="text-green-600 hover:text-green-900 px-2 py-1 rounded bg-green-50 hover:bg-green-100 transition-colors"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => updateSupplierStatus(supplier.id, 'rejected')}
-                              className="text-red-600 hover:text-red-900 px-2 py-1 rounded bg-red-50 hover:bg-red-100 transition-colors"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                        {supplier.status !== 'pending' && (
-                          <span className="text-gray-400">No actions</span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
+                      </p>
+                    </div>
+                  </div>
 
-        {activeTab === 'analytics' && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">Delivery Performance</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-gray-500">Completion Rate</span>
-                  <span className="text-sm font-medium text-gray-900">
-                    {stats.totalDeliveries > 0 ? Math.round((stats.completedDeliveries / stats.totalDeliveries) * 100) : 0}%
+                  <div className="mt-4">
+                    <button
+                      onClick={() => setSelectedSupplier(selectedSupplier?.id === supplier.id ? null : supplier)}
+                      className="text-blue-600 hover:text-blue-700 text-sm font-medium flex items-center space-x-1"
+                    >
+                      <Eye className="h-4 w-4" />
+                      <span>{selectedSupplier?.id === supplier.id ? 'Hide Details' : 'View Details'}</span>
+                    </button>
+                  </div>
+
+                  {selectedSupplier?.id === supplier.id && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg">
+                      <h4 className="font-semibold text-gray-900 mb-2">Associated Data</h4>
+                      <div className="grid grid-cols-3 gap-4 text-sm">
+                        <div>
+                          <p className="text-gray-500">Delivery Partners</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {deliveryPartners.filter(dp => dp.supplierId === supplier.id).length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Customers</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {customers.filter(c => c.supplierId === supplier.id).length}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-gray-500">Farmers</p>
+                          <p className="text-2xl font-bold text-gray-900">
+                            {farmers.filter(f => f.supplierId === supplier.id).length}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex flex-col space-y-2 ml-4">
+                  {supplier.status === 'pending' && (
+                    <>
+                      <button
+                        onClick={() => handleSupplierAction(supplier.id, 'approved')}
+                        className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                      >
+                        <CheckCircle className="h-4 w-4" />
+                        <span>Approve</span>
+                      </button>
+                      <button
+                        onClick={() => handleSupplierAction(supplier.id, 'rejected')}
+                        className="flex items-center space-x-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
+                      >
+                        <XCircle className="h-4 w-4" />
+                        <span>Reject</span>
+                      </button>
+                    </>
+                  )}
+                  {supplier.status === 'approved' && (
+                    <button
+                      onClick={() => handleSupplierAction(supplier.id, 'rejected')}
+                      className="flex items-center space-x-2 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                    >
+                      <Ban className="h-4 w-4" />
+                      <span>Hold</span>
+                    </button>
+                  )}
+                  {supplier.status === 'rejected' && (
+                    <button
+                      onClick={() => handleSupplierAction(supplier.id, 'approved')}
+                      className="flex items-center space-x-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Activate</span>
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          ))}
+
+          {filteredSuppliers.length === 0 && (
+            <div className="bg-white rounded-lg shadow-md p-12 text-center">
+              <Building2 className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No suppliers found</h3>
+              <p className="text-gray-500">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDeliveryPartners = () => {
+    const filteredPartners = deliveryPartners.filter(dp =>
+      dp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dp.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      dp.phone.includes(searchTerm)
+    );
+
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Delivery Partners</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search partners..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredPartners.map(partner => {
+            const supplier = suppliers.find(s => s.id === partner.supplierId);
+            return (
+              <div key={partner.id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">{partner.name}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    partner.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {partner.status}
                   </span>
                 </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="bg-green-600 h-2 rounded-full transition-all duration-300"
-                    style={{ 
-                      width: `${stats.totalDeliveries > 0 ? (stats.completedDeliveries / stats.totalDeliveries) * 100 : 0}%` 
-                    }}
-                  ></div>
-                </div>
-              </div>
-            </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm">
-              <h3 className="text-lg font-medium text-gray-900 mb-4">System Overview</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Total Users</span>
-                  <span className="text-sm font-medium">{stats.totalSuppliers + stats.totalDeliveryPartners + stats.totalCustomers}</span>
+                <div className="space-y-2 text-sm mb-4">
+                  <div>
+                    <p className="text-gray-500">Email</p>
+                    <p className="font-medium text-gray-900">{partner.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+                    <p className="font-medium text-gray-900">{partner.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Vehicle</p>
+                    <p className="font-medium text-gray-900">{partner.vehicleNumber}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Supplier</p>
+                    <p className="font-medium text-gray-900">{supplier?.name || 'Unknown'}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Assigned Customers</p>
+                    <p className="font-medium text-gray-900">{partner.assignedCustomers?.length || 0}</p>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Active Suppliers</span>
-                  <span className="text-sm font-medium">{stats.totalSuppliers}</span>
+
+                <button
+                  onClick={() => handleDeleteDeliveryPartner(partner.id, partner.name)}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            );
+          })}
+
+          {filteredPartners.length === 0 && (
+            <div className="col-span-full bg-white rounded-lg shadow-md p-12 text-center">
+              <Truck className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No delivery partners found</h3>
+              <p className="text-gray-500">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderCustomers = () => {
+    const filteredCustomers = customers.filter(c =>
+      c.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      c.phone.includes(searchTerm)
+    );
+
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Customers</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search customers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredCustomers.map(customer => {
+            const supplier = suppliers.find(s => s.id === customer.supplierId);
+            return (
+              <div key={customer.id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">{customer.name}</h3>
+                  {customer.status && (
+                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                      customer.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {customer.status}
+                    </span>
+                  )}
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-sm text-gray-500">Pending Deliveries</span>
-                  <span className="text-sm font-medium text-yellow-600">{stats.pendingDeliveries}</span>
+
+                <div className="space-y-2 text-sm mb-4">
+                  <div>
+                    <p className="text-gray-500">Email</p>
+                    <p className="font-medium text-gray-900">{customer.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+                    <p className="font-medium text-gray-900">{customer.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Address</p>
+                    <p className="font-medium text-gray-900">{customer.address}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Daily Quantity</p>
+                    <p className="font-medium text-gray-900">{customer.dailyQuantity} L</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Supplier</p>
+                    <p className="font-medium text-gray-900">{supplier?.name || 'Unknown'}</p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+                  className="w-full flex items-center justify-center space-x-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Delete</span>
+                </button>
+              </div>
+            );
+          })}
+
+          {filteredCustomers.length === 0 && (
+            <div className="col-span-full bg-white rounded-lg shadow-md p-12 text-center">
+              <Users className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No customers found</h3>
+              <p className="text-gray-500">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderFarmers = () => {
+    const filteredFarmers = farmers.filter(f =>
+      f.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      f.phone.includes(searchTerm)
+    );
+
+    return (
+      <div>
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-2xl font-bold text-gray-900">Farmers</h2>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search farmers..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {filteredFarmers.map(farmer => {
+            const supplier = suppliers.find(s => s.id === farmer.supplierId);
+            return (
+              <div key={farmer.id} className="bg-white rounded-lg shadow-md p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <h3 className="text-lg font-semibold text-gray-900">{farmer.name}</h3>
+                  <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                    farmer.status === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {farmer.status}
+                  </span>
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <div>
+                    <p className="text-gray-500">Email</p>
+                    <p className="font-medium text-gray-900">{farmer.email}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Phone</p>
+                    <p className="font-medium text-gray-900">{farmer.phone}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Address</p>
+                    <p className="font-medium text-gray-900">{farmer.address}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Supplier</p>
+                    <p className="font-medium text-gray-900">{supplier?.name || 'Unknown'}</p>
+                  </div>
                 </div>
               </div>
+            );
+          })}
+
+          {filteredFarmers.length === 0 && (
+            <div className="col-span-full bg-white rounded-lg shadow-md p-12 text-center">
+              <UserCheck className="h-16 w-16 text-gray-300 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No farmers found</h3>
+              <p className="text-gray-500">Try adjusting your search criteria</p>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm sticky top-0 z-40">
+        <div className="px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+              className="lg:hidden p-2 rounded-md hover:bg-gray-100 transition-colors"
+            >
+              {isMobileMenuOpen ? (
+                <XIcon className="h-6 w-6 text-gray-700" />
+              ) : (
+                <Menu className="h-6 w-6 text-gray-700" />
+              )}
+            </button>
+            <div>
+              <h1 className="text-lg font-bold text-gray-900">Admin Dashboard</h1>
+              <p className="text-xs text-gray-500">{user.name}</p>
             </div>
           </div>
+          <button
+            onClick={handleLogout}
+            className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors px-3 py-2 rounded-md hover:bg-gray-100"
+          >
+            <LogOut className="h-5 w-5" />
+            <span className="hidden sm:inline text-sm">Logout</span>
+          </button>
+        </div>
+      </header>
+
+      <div className="flex">
+        <aside className="hidden lg:block w-64 bg-white shadow-md min-h-screen sticky top-16">
+          <nav className="p-4 space-y-1">
+            {menuItems.map(item => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSearchTerm('');
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                    activeTab === item.id
+                      ? 'bg-blue-50 text-blue-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-sm">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        {isMobileMenuOpen && (
+          <div
+            className="lg:hidden fixed inset-0 bg-black bg-opacity-50 z-30"
+            onClick={() => setIsMobileMenuOpen(false)}
+          />
         )}
+
+        <aside
+          className={`lg:hidden fixed left-0 top-16 bottom-0 w-64 bg-white shadow-lg z-40 transform transition-transform duration-300 ease-in-out overflow-y-auto ${
+            isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+        >
+          <nav className="p-4 space-y-1">
+            {menuItems.map(item => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    setActiveTab(item.id);
+                    setSearchTerm('');
+                    setIsMobileMenuOpen(false);
+                  }}
+                  className={`w-full flex items-center space-x-3 px-4 py-3 rounded-lg transition-colors ${
+                    activeTab === item.id
+                      ? 'bg-blue-50 text-blue-600 font-medium'
+                      : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-sm">{item.label}</span>
+                </button>
+              );
+            })}
+          </nav>
+        </aside>
+
+        <main className="flex-1 p-4 lg:p-8">
+          {activeTab === 'overview' && renderOverview()}
+          {activeTab === 'suppliers' && renderSuppliers()}
+          {activeTab === 'delivery-partners' && renderDeliveryPartners()}
+          {activeTab === 'customers' && renderCustomers()}
+          {activeTab === 'farmers' && renderFarmers()}
+        </main>
       </div>
     </div>
   );
