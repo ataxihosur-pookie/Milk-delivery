@@ -1,25 +1,27 @@
-import React, { useState, useEffect } from 'react';
-import LoginPage from './components/LoginPage';
+import React, { useState } from 'react';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import LandingPage from './components/LandingPage';
+import AdminLogin from './components/AdminLogin';
+import SupplierLogin from './components/SupplierLogin';
+import DeliveryLogin from './components/DeliveryLogin';
+import FarmerLogin from './components/FarmerLogin';
+import CustomerLogin from './components/CustomerLogin';
 import AdminDashboard from './components/AdminDashboard';
 import SupplierDashboard from './components/SupplierDashboard';
 import DeliveryPartnerDashboard from './components/DeliveryPartnerDashboard';
-import CustomerPortal from './components/CustomerPortal';
 import FarmerDashboard from './components/FarmerDashboard';
+import CustomerPortal from './components/CustomerPortal';
+import ProtectedRoute from './components/ProtectedRoute';
 import { User, AuthProvider } from './context/AuthContext';
 import { DataProvider } from './context/DataContext';
 import { useData } from './context/DataContext';
 
 function AppContent() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const { loading, error } = useData();
-
-  useEffect(() => {
-    // Check for existing session
+  const [currentUser, setCurrentUser] = useState<User | null>(() => {
     const savedUser = localStorage.getItem('currentUser');
-    if (savedUser) {
-      setCurrentUser(JSON.parse(savedUser));
-    }
-  }, []);
+    return savedUser ? JSON.parse(savedUser) : null;
+  });
+  const { loading, error } = useData();
 
   const handleLogin = (user: User) => {
     setCurrentUser(user);
@@ -48,31 +50,69 @@ function AppContent() {
     );
   }
 
-  if (!currentUser) {
-    return <LoginPage onLogin={handleLogin} />;
-  }
-
-  const renderDashboard = () => {
-    switch (currentUser.role) {
-      case 'admin':
-        return <AdminDashboard user={currentUser} onLogout={handleLogout} />;
-      case 'supplier':
-        return <SupplierDashboard user={currentUser} onLogout={handleLogout} />;
-      case 'delivery_partner':
-        return <DeliveryPartnerDashboard user={currentUser} onLogout={handleLogout} />;
-      case 'farmer':
-        return <FarmerDashboard user={currentUser} onLogout={handleLogout} />;
-      case 'customer':
-        return <CustomerPortal user={currentUser} onLogout={handleLogout} />;
-      default:
-        return <LoginPage onLogin={handleLogin} />;
-    }
-  };
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
-      {renderDashboard()}
-    </div>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+
+        <Route path="/admin/login" element={<AdminLogin onLogin={handleLogin} />} />
+        <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+        <Route
+          path="/admin/dashboard"
+          element={
+            <ProtectedRoute allowedRole="admin">
+              <AdminDashboard user={currentUser!} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/supplier/login" element={<SupplierLogin onLogin={handleLogin} />} />
+        <Route path="/supplier" element={<Navigate to="/supplier/dashboard" replace />} />
+        <Route
+          path="/supplier/dashboard"
+          element={
+            <ProtectedRoute allowedRole="supplier">
+              <SupplierDashboard user={currentUser!} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/delivery/login" element={<DeliveryLogin onLogin={handleLogin} />} />
+        <Route path="/delivery" element={<Navigate to="/delivery/dashboard" replace />} />
+        <Route
+          path="/delivery/dashboard"
+          element={
+            <ProtectedRoute allowedRole="delivery_partner">
+              <DeliveryPartnerDashboard user={currentUser!} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/farmer/login" element={<FarmerLogin onLogin={handleLogin} />} />
+        <Route path="/farmer" element={<Navigate to="/farmer/dashboard" replace />} />
+        <Route
+          path="/farmer/dashboard"
+          element={
+            <ProtectedRoute allowedRole="farmer">
+              <FarmerDashboard user={currentUser!} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="/customer/login" element={<CustomerLogin onLogin={handleLogin} />} />
+        <Route path="/customer" element={<Navigate to="/customer/dashboard" replace />} />
+        <Route
+          path="/customer/dashboard"
+          element={
+            <ProtectedRoute allowedRole="customer">
+              <CustomerPortal user={currentUser!} onLogout={handleLogout} />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    </BrowserRouter>
   );
 }
 

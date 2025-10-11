@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogOut, Plus, Truck, Users, Package, Calendar, Milk, UserPlus } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -13,6 +14,12 @@ interface SupplierDashboardProps {
 }
 
 const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    onLogout();
+    navigate('/supplier/login');
+  };
   const { deliveryPartners, customers, deliveries, suppliers, dailyAllocations, farmers, pickupLogs, addDeliveryPartner, addCustomer, addFarmer, addPickupLog, assignCustomersToPartner, updateCustomerStatus, deleteCustomer, updateDeliveryPartnerStatus, deleteDeliveryPartner, refreshData } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [showNewCustomerForm, setShowNewCustomerForm] = useState(false);
@@ -364,7 +371,7 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-500">Welcome, {user.name}</span>
               <button
-                onClick={onLogout}
+                onClick={handleLogout}
                 className="flex items-center space-x-2 text-gray-500 hover:text-gray-700 transition-colors"
               >
                 <LogOut className="h-5 w-5" />

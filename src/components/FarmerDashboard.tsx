@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogOut, Milk, TrendingUp, Calendar, DollarSign } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -9,6 +10,13 @@ interface FarmerDashboardProps {
 }
 
 const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onLogout }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    onLogout();
+    navigate('/farmer/login');
+  };
+
   const { farmers, pickupLogs, suppliers } = useData();
   const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7));
 
@@ -42,7 +50,7 @@ const FarmerDashboard: React.FC<FarmerDashboardProps> = ({ user, onLogout }) => 
               )}
             </div>
             <button
-              onClick={onLogout}
+              onClick={handleLogout}
               className="flex items-center space-x-2 px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"
             >
               <LogOut className="h-5 w-5" />

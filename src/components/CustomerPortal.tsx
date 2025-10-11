@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { LogOut, Package, ShoppingBag, Newspaper, Bell, User, Home, Droplet, Calendar, TrendingUp, Award, Clock, MapPin } from 'lucide-react';
 import { User as UserType } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
@@ -10,6 +11,13 @@ interface CustomerPortalProps {
 }
 
 const CustomerPortal: React.FC<CustomerPortalProps> = ({ user, onLogout }) => {
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    onLogout();
+    navigate('/customer/login');
+  };
+
   const { deliveries, deliveryPartners, customers, getCustomerInvoices } = useData();
   const [activeSection, setActiveSection] = useState('home');
   const [invoices, setInvoices] = useState<MonthlyInvoice[]>([]);
@@ -349,7 +357,7 @@ const CustomerPortal: React.FC<CustomerPortalProps> = ({ user, onLogout }) => {
       </div>
 
       <button
-        onClick={onLogout}
+        onClick={handleLogout}
         className="w-full py-3 bg-red-500 text-white rounded-xl font-medium hover:bg-red-600 transition-colors duration-300 flex items-center justify-center space-x-2"
       >
         <LogOut className="h-5 w-5" />
