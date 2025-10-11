@@ -200,6 +200,7 @@ interface DataContextType {
   getRouteFarmers: (routeId: string) => Farmer[];
   updateRemainingQuantity: (partnerId: string, date: string, deliveredQuantity: number) => Promise<void>;
   updateSupplierStatus: (supplierId: string, status: 'approved' | 'rejected') => Promise<void>;
+  deleteSupplier: (supplierId: string) => Promise<void>;
   getPendingSuppliers: () => Supplier[];
   refreshData: () => Promise<void>;
   addCustomerUser: (data: { name: string; phone: string; password: string }) => Promise<CustomerUser | null>;
@@ -256,6 +257,7 @@ const DataContext = createContext<DataContextType>({
   getRouteFarmers: () => [],
   updateRemainingQuantity: async () => {},
   updateSupplierStatus: async () => {},
+  deleteSupplier: async () => {},
   getPendingSuppliers: () => [],
   refreshData: async () => {},
   addCustomerUser: async () => null,
@@ -1380,6 +1382,22 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     }
   };
 
+  const deleteSupplier = async (supplierId: string) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!.from('suppliers').delete().eq('id', supplierId);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error deleting supplier:', error);
+      throw error;
+    }
+  };
+
   const getPendingSuppliers = (): Supplier[] => {
     return suppliers.filter(supplier => supplier.status === 'pending');
   };
@@ -1892,6 +1910,7 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       getRouteFarmers,
       updateRemainingQuantity,
       updateSupplierStatus,
+      deleteSupplier,
       getPendingSuppliers,
       refreshData,
       addCustomerUser: customerService.addCustomerUser,

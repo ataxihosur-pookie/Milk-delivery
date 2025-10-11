@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Users, Building2, Truck, UserCheck, Package, Search, Ban, Trash2, CheckCircle, XCircle, Eye, Menu, X as XIcon } from 'lucide-react';
+import { LogOut, Users, Building2, Truck, UserCheck, Package, Search, Ban, Trash2, CheckCircle, XCircle, Eye, Menu, X as XIcon, Plus } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 
@@ -11,11 +11,22 @@ interface AdminDashboardProps {
 
 const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   const navigate = useNavigate();
-  const { suppliers, deliveryPartners, customers, farmers, deliveries, updateSupplierStatus, deleteCustomer, deleteDeliveryPartner } = useData();
+  const { suppliers, deliveryPartners, customers, farmers, deliveries, updateSupplierStatus, deleteSupplier, addSupplier, deleteCustomer, deleteDeliveryPartner } = useData();
   const [activeTab, setActiveTab] = useState('overview');
   const [searchTerm, setSearchTerm] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedSupplier, setSelectedSupplier] = useState<any>(null);
+  const [showAddSupplierModal, setShowAddSupplierModal] = useState(false);
+  const [newSupplierData, setNewSupplierData] = useState({
+    name: '',
+    email: '',
+    username: '',
+    password: '',
+    phone: '',
+    address: '',
+    licenseNumber: '',
+    totalCapacity: ''
+  });
 
   const handleLogout = () => {
     onLogout();
@@ -37,6 +48,57 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
   const handleDeleteDeliveryPartner = async (partnerId: string, partnerName: string) => {
     if (window.confirm(`Are you sure you want to delete delivery partner "${partnerName}"? This action cannot be undone.`)) {
       await deleteDeliveryPartner(partnerId);
+    }
+  };
+
+  const handleDeleteSupplier = async (supplierId: string, supplierName: string) => {
+    if (window.confirm(`Are you sure you want to delete supplier "${supplierName}"? This will also delete all associated data (delivery partners, customers, farmers). This action cannot be undone.`)) {
+      try {
+        await deleteSupplier(supplierId);
+        alert('Supplier deleted successfully');
+      } catch (error) {
+        alert('Failed to delete supplier. Please try again.');
+      }
+    }
+  };
+
+  const handleAddSupplier = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!newSupplierData.name || !newSupplierData.email || !newSupplierData.username ||
+        !newSupplierData.password || !newSupplierData.phone) {
+      alert('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      await addSupplier({
+        name: newSupplierData.name,
+        email: newSupplierData.email,
+        username: newSupplierData.username,
+        password: newSupplierData.password,
+        phone: newSupplierData.phone,
+        address: newSupplierData.address,
+        licenseNumber: newSupplierData.licenseNumber,
+        totalCapacity: parseInt(newSupplierData.totalCapacity) || 0,
+        status: 'approved',
+        registrationDate: new Date().toISOString()
+      });
+
+      setShowAddSupplierModal(false);
+      setNewSupplierData({
+        name: '',
+        email: '',
+        username: '',
+        password: '',
+        phone: '',
+        address: '',
+        licenseNumber: '',
+        totalCapacity: ''
+      });
+      alert('Supplier added successfully! Credentials:\nUsername: ' + newSupplierData.username + '\nPassword: ' + newSupplierData.password);
+    } catch (error) {
+      alert('Failed to add supplier. Please try again.');
     }
   };
 
@@ -144,17 +206,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
     return (
       <div>
-        <div className="flex justify-between items-center mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
           <h2 className="text-2xl font-bold text-gray-900">Suppliers Management</h2>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search suppliers..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
-            />
+          <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+            <div className="relative flex-1 sm:flex-initial">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search suppliers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+              />
+            </div>
+            <button
+              onClick={() => setShowAddSupplierModal(true)}
+              className="flex items-center justify-center space-x-2 bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors whitespace-nowrap"
+            >
+              <Plus className="h-5 w-5" />
+              <span>Add Supplier</span>
+            </button>
           </div>
         </div>
 
@@ -277,6 +348,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
                       <span>Activate</span>
                     </button>
                   )}
+                  <button
+                    onClick={() => handleDeleteSupplier(supplier.id, supplier.name)}
+                    className="flex items-center space-x-2 px-4 py-2 bg-red-50 text-red-600 rounded-md hover:bg-red-100 transition-colors border border-red-200"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                    <span>Delete</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -535,6 +613,152 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ user, onLogout }) => {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {showAddSupplierModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-2xl font-bold text-gray-900">Add New Supplier</h3>
+                <button
+                  onClick={() => setShowAddSupplierModal(false)}
+                  className="text-gray-400 hover:text-gray-600"
+                >
+                  <XIcon className="h-6 w-6" />
+                </button>
+              </div>
+
+              <form onSubmit={handleAddSupplier} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Supplier Name *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newSupplierData.name}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, name: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      value={newSupplierData.email}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, email: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Username * (for login)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newSupplierData.username}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, username: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Password * (for login)
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={newSupplierData.password}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, password: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Create a password"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Phone *
+                    </label>
+                    <input
+                      type="tel"
+                      required
+                      value={newSupplierData.phone}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, phone: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      License Number
+                    </label>
+                    <input
+                      type="text"
+                      value={newSupplierData.licenseNumber}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, licenseNumber: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Total Capacity (L/day)
+                    </label>
+                    <input
+                      type="number"
+                      value={newSupplierData.totalCapacity}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, totalCapacity: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Address
+                    </label>
+                    <textarea
+                      value={newSupplierData.address}
+                      onChange={(e) => setNewSupplierData({...newSupplierData, address: e.target.value})}
+                      rows={3}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mt-4">
+                  <p className="text-sm text-blue-800">
+                    <strong>Note:</strong> The supplier will be created with "Approved" status and can log in immediately with the provided credentials.
+                  </p>
+                </div>
+
+                <div className="flex justify-end space-x-3 mt-6 pt-4 border-t">
+                  <button
+                    type="button"
+                    onClick={() => setShowAddSupplierModal(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                  >
+                    Add Supplier
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white shadow-sm sticky top-0 z-40">
         <div className="px-4 py-3 flex items-center justify-between">
           <div className="flex items-center space-x-3">
