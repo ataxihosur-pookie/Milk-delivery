@@ -113,6 +113,55 @@ export interface DailyAllocation {
   createdAt: string;
 }
 
+export interface Product {
+  id: string;
+  supplier_id: string;
+  name: string;
+  description: string;
+  price: number;
+  image_url: string;
+  category: string;
+  unit: string;
+  in_stock: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Order {
+  id: string;
+  customer_id: string;
+  supplier_id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  delivery_address: string;
+  delivery_date: string;
+  notes: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface OrderItem {
+  id: string;
+  order_id: string;
+  product_id: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  created_at: string;
+}
+
+export interface SupplierUpdate {
+  id: string;
+  supplier_id: string;
+  title: string;
+  content: string;
+  type: string;
+  published: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 interface DataContextType {
   suppliers: Supplier[];
   deliveryPartners: DeliveryPartner[];
@@ -122,6 +171,10 @@ interface DataContextType {
   pickupLogs: PickupLog[];
   deliveries: Delivery[];
   dailyAllocations: DailyAllocation[];
+  products: Product[];
+  orders: Order[];
+  orderItems: OrderItem[];
+  supplierUpdates: SupplierUpdate[];
   loading: boolean;
   error: string | null;
   addSupplier: (supplier: Omit<Supplier, 'id'>) => Promise<void>;
@@ -155,6 +208,14 @@ interface DataContextType {
   updateSupplierPricing: (supplierId: string, pricePerLiter: number) => Promise<void>;
   getCustomerInvoices: (phone: string) => Promise<MonthlyInvoice[]>;
   getInvoiceLineItems: (invoiceId: string) => Promise<InvoiceLineItem[]>;
+  addProduct: (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateProduct: (productId: string, product: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
+  deleteProduct: (productId: string) => Promise<void>;
+  addOrder: (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>, items: Omit<OrderItem, 'id' | 'order_id' | 'created_at'>[]) => Promise<void>;
+  updateOrderStatus: (orderId: string, status: string) => Promise<void>;
+  addSupplierUpdate: (update: Omit<SupplierUpdate, 'id' | 'created_at' | 'updated_at'>) => Promise<void>;
+  updateSupplierUpdate: (updateId: string, update: Partial<Omit<SupplierUpdate, 'id' | 'created_at' | 'updated_at'>>) => Promise<void>;
+  deleteSupplierUpdate: (updateId: string) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType>({
@@ -166,6 +227,10 @@ const DataContext = createContext<DataContextType>({
   pickupLogs: [],
   deliveries: [],
   dailyAllocations: [],
+  products: [],
+  orders: [],
+  orderItems: [],
+  supplierUpdates: [],
   loading: false,
   error: null,
   addSupplier: async () => {},
@@ -198,7 +263,15 @@ const DataContext = createContext<DataContextType>({
   getSupplierPricing: async () => null,
   updateSupplierPricing: async () => {},
   getCustomerInvoices: async () => [],
-  getInvoiceLineItems: async () => []
+  getInvoiceLineItems: async () => [],
+  addProduct: async () => {},
+  updateProduct: async () => {},
+  deleteProduct: async () => {},
+  addOrder: async () => {},
+  updateOrderStatus: async () => {},
+  addSupplierUpdate: async () => {},
+  updateSupplierUpdate: async () => {},
+  deleteSupplierUpdate: async () => {}
 });
 
 export const useData = () => useContext(DataContext);
@@ -216,6 +289,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
   const [pickupLogs, setPickupLogs] = useState<PickupLog[]>([]);
   const [deliveries, setDeliveries] = useState<Delivery[]>([]);
   const [dailyAllocations, setDailyAllocations] = useState<DailyAllocation[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [supplierUpdates, setSupplierUpdates] = useState<SupplierUpdate[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -447,6 +524,54 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
         console.warn('Error loading pickup logs:', pickupLogsError);
       } else {
         setPickupLogs((pickupLogsData || []).map(convertPickupLog));
+      }
+
+      // Load products
+      const { data: productsData, error: productsError } = await supabase!
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (productsError) {
+        console.warn('Error loading products:', productsError);
+      } else {
+        setProducts(productsData || []);
+      }
+
+      // Load orders
+      const { data: ordersData, error: ordersError } = await supabase!
+        .from('orders')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (ordersError) {
+        console.warn('Error loading orders:', ordersError);
+      } else {
+        setOrders(ordersData || []);
+      }
+
+      // Load order items
+      const { data: orderItemsData, error: orderItemsError } = await supabase!
+        .from('order_items')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (orderItemsError) {
+        console.warn('Error loading order items:', orderItemsError);
+      } else {
+        setOrderItems(orderItemsData || []);
+      }
+
+      // Load supplier updates
+      const { data: updatesData, error: updatesError } = await supabase!
+        .from('supplier_updates')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (updatesError) {
+        console.warn('Error loading supplier updates:', updatesError);
+      } else {
+        setSupplierUpdates(updatesData || []);
       }
 
     } catch (error: any) {
@@ -1574,6 +1699,160 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
     return farmers.filter(farmer => farmer.routeId === routeId);
   };
 
+  const addProduct = async (product: Omit<Product, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!.from('products').insert([product]);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding product:', error);
+      throw error;
+    }
+  };
+
+  const updateProduct = async (productId: string, product: Partial<Omit<Product, 'id' | 'created_at' | 'updated_at'>>) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!
+        .from('products')
+        .update({ ...product, updated_at: new Date().toISOString() })
+        .eq('id', productId);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error updating product:', error);
+      throw error;
+    }
+  };
+
+  const deleteProduct = async (productId: string) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!.from('products').delete().eq('id', productId);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      throw error;
+    }
+  };
+
+  const addOrder = async (order: Omit<Order, 'id' | 'created_at' | 'updated_at'>, items: Omit<OrderItem, 'id' | 'order_id' | 'created_at'>[]) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { data: orderData, error: orderError } = await supabase!
+        .from('orders')
+        .insert([order])
+        .select()
+        .single();
+
+      if (orderError) throw orderError;
+
+      const orderItemsWithOrderId = items.map(item => ({
+        ...item,
+        order_id: orderData.id
+      }));
+
+      const { error: itemsError } = await supabase!
+        .from('order_items')
+        .insert(orderItemsWithOrderId);
+
+      if (itemsError) throw itemsError;
+
+      await refreshData();
+    } catch (error) {
+      console.error('Error creating order:', error);
+      throw error;
+    }
+  };
+
+  const updateOrderStatus = async (orderId: string, status: string) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!
+        .from('orders')
+        .update({ status, updated_at: new Date().toISOString() })
+        .eq('id', orderId);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      throw error;
+    }
+  };
+
+  const addSupplierUpdate = async (update: Omit<SupplierUpdate, 'id' | 'created_at' | 'updated_at'>) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!.from('supplier_updates').insert([update]);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error adding supplier update:', error);
+      throw error;
+    }
+  };
+
+  const updateSupplierUpdate = async (updateId: string, update: Partial<Omit<SupplierUpdate, 'id' | 'created_at' | 'updated_at'>>) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!
+        .from('supplier_updates')
+        .update({ ...update, updated_at: new Date().toISOString() })
+        .eq('id', updateId);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error updating supplier update:', error);
+      throw error;
+    }
+  };
+
+  const deleteSupplierUpdate = async (updateId: string) => {
+    if (!isSupabaseAvailable()) {
+      console.warn('Supabase not available');
+      return;
+    }
+
+    try {
+      const { error } = await supabase!.from('supplier_updates').delete().eq('id', updateId);
+      if (error) throw error;
+      await refreshData();
+    } catch (error) {
+      console.error('Error deleting supplier update:', error);
+      throw error;
+    }
+  };
+
   return (
     <DataContext.Provider value={{
       suppliers,
@@ -1584,6 +1863,10 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       pickupLogs,
       deliveries,
       dailyAllocations,
+      products,
+      orders,
+      orderItems,
+      supplierUpdates,
       loading,
       error,
       addSupplier,
@@ -1616,7 +1899,15 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       getSupplierPricing: customerService.getSupplierPricing,
       updateSupplierPricing: customerService.updateSupplierPricing,
       getCustomerInvoices: customerService.getCustomerInvoices,
-      getInvoiceLineItems: customerService.getInvoiceLineItems
+      getInvoiceLineItems: customerService.getInvoiceLineItems,
+      addProduct,
+      updateProduct,
+      deleteProduct,
+      addOrder,
+      updateOrderStatus,
+      addSupplierUpdate,
+      updateSupplierUpdate,
+      deleteSupplierUpdate
     }}>
       {children}
     </DataContext.Provider>
