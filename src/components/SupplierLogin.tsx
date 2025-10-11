@@ -141,13 +141,6 @@ const SupplierLogin: React.FC<SupplierLoginProps> = ({ onLogin }) => {
             >
               New supplier? Sign up here
             </button>
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="block w-full text-sm text-gray-600 hover:text-gray-500 font-medium"
-            >
-              Back to Portal Selection
-            </button>
           </div>
 
           <div className="mt-6 text-xs text-gray-500 space-y-2">

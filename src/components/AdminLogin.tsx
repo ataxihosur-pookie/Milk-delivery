@@ -106,16 +106,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ onLogin }) => {
             </button>
           </div>
 
-          <div className="text-center">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="text-sm text-blue-600 hover:text-blue-500 font-medium"
-            >
-              Back to Portal Selection
-            </button>
-          </div>
-
           <div className="mt-6 text-xs text-gray-500 space-y-2">
             <div className="font-semibold">Demo Credentials:</div>
             <div>Email: admin@milkchain.com</div>
