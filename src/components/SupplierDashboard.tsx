@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext';
 import AllocateMilk from './AllocateMilk';
 import AddDeliveryPartner from './AddDeliveryPartner';
 import CustomerAssignment from './CustomerAssignment';
+import SupplierPricing from './SupplierPricing';
 
 interface SupplierDashboardProps {
   user: User;
@@ -447,6 +448,16 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
             Customer Assignment
           </button>
           <button
+            onClick={() => setActiveTab('pricing')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'pricing'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Pricing
+          </button>
+          <button
             onClick={() => setActiveTab('temp-deliveries')}
             className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
               activeTab === 'temp-deliveries'
@@ -854,6 +865,10 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
 
         {activeTab === 'assignments' && (
           <CustomerAssignment supplierId={supplierId} />
+        )}
+
+        {activeTab === 'pricing' && (
+          <SupplierPricing supplierId={supplierId} />
         )}
 
         {/* Temporary Deliveries Tab */}

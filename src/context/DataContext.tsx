@@ -1,12 +1,14 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
-import type { 
-  Supplier as SupabaseSupplier, 
-  DeliveryPartner as SupabaseDeliveryPartner, 
+import type {
+  Supplier as SupabaseSupplier,
+  DeliveryPartner as SupabaseDeliveryPartner,
   Customer as SupabaseCustomer,
   DailyAllocation as SupabaseDailyAllocation,
   Delivery as SupabaseDelivery
 } from '../lib/supabase';
+import * as customerService from '../lib/customerService';
+import type { CustomerUser, SupplierPricing, MonthlyInvoice, InvoiceLineItem } from '../lib/customerService';
 
 export interface DeliveryPartner {
   id: string;
@@ -147,6 +149,12 @@ interface DataContextType {
   updateSupplierStatus: (supplierId: string, status: 'approved' | 'rejected') => Promise<void>;
   getPendingSuppliers: () => Supplier[];
   refreshData: () => Promise<void>;
+  addCustomerUser: (data: { name: string; phone: string; password: string }) => Promise<CustomerUser | null>;
+  authenticateCustomer: (phone: string, password: string) => Promise<CustomerUser | null>;
+  getSupplierPricing: (supplierId: string) => Promise<SupplierPricing | null>;
+  updateSupplierPricing: (supplierId: string, pricePerLiter: number) => Promise<void>;
+  getCustomerInvoices: (phone: string) => Promise<MonthlyInvoice[]>;
+  getInvoiceLineItems: (invoiceId: string) => Promise<InvoiceLineItem[]>;
 }
 
 const DataContext = createContext<DataContextType>({
@@ -184,7 +192,13 @@ const DataContext = createContext<DataContextType>({
   updateRemainingQuantity: async () => {},
   updateSupplierStatus: async () => {},
   getPendingSuppliers: () => [],
-  refreshData: async () => {}
+  refreshData: async () => {},
+  addCustomerUser: async () => null,
+  authenticateCustomer: async () => null,
+  getSupplierPricing: async () => null,
+  updateSupplierPricing: async () => {},
+  getCustomerInvoices: async () => [],
+  getInvoiceLineItems: async () => []
 });
 
 export const useData = () => useContext(DataContext);
@@ -1596,7 +1610,13 @@ export const DataProvider: React.FC<DataProviderProps> = ({ children }) => {
       updateRemainingQuantity,
       updateSupplierStatus,
       getPendingSuppliers,
-      refreshData
+      refreshData,
+      addCustomerUser: customerService.addCustomerUser,
+      authenticateCustomer: customerService.authenticateCustomer,
+      getSupplierPricing: customerService.getSupplierPricing,
+      updateSupplierPricing: customerService.updateSupplierPricing,
+      getCustomerInvoices: customerService.getCustomerInvoices,
+      getInvoiceLineItems: customerService.getInvoiceLineItems
     }}>
       {children}
     </DataContext.Provider>

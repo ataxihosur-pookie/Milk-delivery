@@ -3,18 +3,20 @@ import { Milk, Eye, EyeOff, Users, Truck, ShoppingCart, Sprout } from 'lucide-re
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import SupplierSignup from './SupplierSignup';
+import CustomerSignup from './CustomerSignup';
 
 interface LoginPageProps {
   onLogin: (user: User) => void;
 }
 
 const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
-  const { deliveryPartners, suppliers, farmers } = useData();
+  const { deliveryPartners, suppliers, farmers, authenticateCustomer } = useData();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [userRole, setUserRole] = useState<'admin' | 'supplier' | 'delivery_partner' | 'customer' | 'farmer'>('supplier');
   const [showSignup, setShowSignup] = useState(false);
+  const [showCustomerSignup, setShowCustomerSignup] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -88,11 +90,31 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           setError('Invalid credentials or account not approved yet.');
         }
       }
+    } else if (userRole === 'customer') {
+      const normalizedPhone = email.replace(/\s+/g, '');
+
+      authenticateCustomer(normalizedPhone, password)
+        .then(customerUser => {
+          if (customerUser) {
+            const user: User = {
+              id: customerUser.id,
+              name: customerUser.name,
+              email: customerUser.phone,
+              role: 'customer',
+              phone: customerUser.phone
+            };
+            onLogin(user);
+          } else {
+            setError('Invalid phone number or password.');
+          }
+        })
+        .catch(err => {
+          console.error('Customer login error:', err);
+          setError('Login failed. Please try again.');
+        });
     } else {
-      // Demo login credentials for other roles
       const demoCredentials = {
-        admin: { email: 'admin@milkchain.com', password: 'admin123', name: 'Admin User' },
-        customer: { email: 'john@example.com', password: 'customer123', name: 'John Smith' }
+        admin: { email: 'admin@milkchain.com', password: 'admin123', name: 'Admin User' }
       };
 
       const credentials = demoCredentials[userRole as keyof typeof demoCredentials];
@@ -102,8 +124,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
           id: `${userRole}-1`,
           name: credentials.name,
           email: credentials.email,
-          role: userRole,
-          supplierId: userRole === 'customer' ? 'supplier-1' : undefined
+          role: userRole
         };
         onLogin(user);
       } else {
@@ -114,6 +135,10 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
 
   if (showSignup) {
     return <SupplierSignup onBack={() => setShowSignup(false)} onSignupSuccess={() => setShowSignup(false)} />;
+  }
+
+  if (showCustomerSignup) {
+    return <CustomerSignup onBack={() => setShowCustomerSignup(false)} onSignupSuccess={() => setShowCustomerSignup(false)} />;
   }
 
   return (
@@ -195,18 +220,18 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
             <div className="space-y-4">
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                  {userRole === 'farmer' ? 'Phone Number' : userRole === 'supplier' ? 'Username or Email' : userRole === 'delivery_partner' ? 'Email Address' : 'Email address'}
+                  {userRole === 'farmer' || userRole === 'customer' ? 'Phone Number' : userRole === 'supplier' ? 'Username or Email' : userRole === 'delivery_partner' ? 'Email Address' : 'Email address'}
                 </label>
                 <input
                   id="email"
                   name="email"
-                  type={userRole === 'farmer' ? 'tel' : userRole === 'supplier' ? 'text' : 'email'}
-                  autoComplete={userRole === 'farmer' ? 'tel' : userRole === 'supplier' ? 'username' : 'email'}
+                  type={userRole === 'farmer' || userRole === 'customer' ? 'tel' : userRole === 'supplier' ? 'text' : 'email'}
+                  autoComplete={userRole === 'farmer' || userRole === 'customer' ? 'tel' : userRole === 'supplier' ? 'username' : 'email'}
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="mt-1 appearance-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 focus:z-10 sm:text-sm"
-                  placeholder={userRole === 'farmer' ? 'Enter phone number' : userRole === 'supplier' ? 'Enter username or email' : userRole === 'delivery_partner' ? 'Enter your email address' : 'Enter your email'}
+                  placeholder={userRole === 'farmer' || userRole === 'customer' ? 'Enter phone number' : userRole === 'supplier' ? 'Enter username or email' : userRole === 'delivery_partner' ? 'Enter your email address' : 'Enter your email'}
                 />
               </div>
               <div className="relative">
@@ -253,14 +278,23 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               </button>
             </div>
 
-            <div className="text-center">
+            <div className="text-center space-y-2">
               <button
                 type="button"
                 onClick={() => setShowSignup(true)}
-                className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+                className="block w-full text-sm text-blue-600 hover:text-blue-500 font-medium"
               >
                 New supplier? Sign up here
               </button>
+              {userRole === 'customer' && (
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerSignup(true)}
+                  className="block w-full text-sm text-green-600 hover:text-green-500 font-medium"
+                >
+                  New customer? Create account
+                </button>
+              )}
             </div>
 
             <div className="mt-6 text-xs text-gray-500 space-y-2">
@@ -268,7 +302,7 @@ const LoginPage: React.FC<LoginPageProps> = ({ onLogin }) => {
               <div>Admin: admin@milkchain.com / admin123</div>
               <div>Supplier: Use username/password from registration (or demo: admin@puredairy.com / supplier123)</div>
               <div>Delivery: Use email & password created by supplier</div>
-              <div>Customer: john@example.com / customer123</div>
+              <div>Customer: Use phone number & password from customer signup</div>
             </div>
           </form>
         </div>
