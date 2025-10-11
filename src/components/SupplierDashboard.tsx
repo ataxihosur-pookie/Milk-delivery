@@ -319,6 +319,16 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
           >
             Customer Assignment
           </button>
+          <button
+            onClick={() => setActiveTab('temp-deliveries')}
+            className={`py-2 px-1 border-b-2 font-medium text-sm transition-colors whitespace-nowrap ${
+              activeTab === 'temp-deliveries'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            }`}
+          >
+            Temporary Deliveries
+          </button>
         </nav>
 
         {activeTab === 'overview' && (
@@ -537,7 +547,9 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {myCustomers.map((customer) => (
+                  {myCustomers
+                    .filter(customer => !customer.name.startsWith('[TEMP]'))
+                    .map((customer) => (
                     <tr key={customer.id}>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {customer.name}
@@ -628,6 +640,74 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
 
         {activeTab === 'assignments' && (
           <CustomerAssignment supplierId={supplierId} />
+        )}
+
+        {/* Temporary Deliveries Tab */}
+        {activeTab === 'temp-deliveries' && (
+          <div className="bg-white rounded-lg shadow-sm p-6">
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-3 bg-orange-100 rounded-lg">
+                <Package className="h-6 w-6 text-orange-600" />
+              </div>
+              <div>
+                <h3 className="text-lg font-medium text-gray-900">Temporary Deliveries</h3>
+                <p className="text-sm text-gray-500">View one-time deliveries recorded by delivery partners</p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              {myDeliveries
+                .filter(d => {
+                  const customer = myCustomers.find(c => c.id === d.customerId);
+                  return customer && customer.name.startsWith('[TEMP]');
+                })
+                .map(delivery => {
+                  const customer = myCustomers.find(c => c.id === delivery.customerId);
+                  const partner = myDeliveryPartners.find(p => p.id === delivery.deliveryPartnerId);
+                  if (!customer) return null;
+
+                  return (
+                    <div key={delivery.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border border-gray-200">
+                      <div className="flex-1">
+                        <div className="flex items-center space-x-2">
+                          <p className="font-medium text-gray-900">{customer.name.replace('[TEMP] ', '')}</p>
+                          <span className="px-2 py-1 text-xs font-medium bg-orange-100 text-orange-800 rounded-full">
+                            Temporary
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">Phone: {customer.phone}</p>
+                        <p className="text-sm text-gray-600">Address: {customer.address}</p>
+                        <p className="text-sm text-gray-500 mt-1">
+                          Delivered by: {partner?.name || 'Unknown Partner'}
+                        </p>
+                        {delivery.notes && (
+                          <p className="text-sm text-gray-500 italic mt-1">{delivery.notes}</p>
+                        )}
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="text-lg font-bold text-blue-600">{delivery.quantity}L</p>
+                        <p className="text-sm text-gray-500">{new Date(delivery.scheduledTime).toLocaleDateString()}</p>
+                        <span className={`inline-block px-3 py-1 mt-2 text-xs font-medium rounded-full ${
+                          delivery.status === 'completed'
+                            ? 'bg-green-100 text-green-800'
+                            : delivery.status === 'cancelled'
+                            ? 'bg-red-100 text-red-800'
+                            : 'bg-yellow-100 text-yellow-800'
+                        }`}>
+                          {delivery.status}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              {myDeliveries.filter(d => {
+                const customer = myCustomers.find(c => c.id === d.customerId);
+                return customer && customer.name.startsWith('[TEMP]');
+              }).length === 0 && (
+                <p className="text-center text-gray-500 py-12">No temporary deliveries recorded</p>
+              )}
+            </div>
+          </div>
         )}
 
         {/* Farmers Tab */}

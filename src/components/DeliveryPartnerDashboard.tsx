@@ -34,6 +34,9 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
   const [milkIntake, setMilkIntake] = useState({
     farmerId: '',
     quantity: 0,
+    qualityGrade: 'A' as 'A' | 'B' | 'C',
+    fatContent: 0,
+    pricePerLiter: 0,
     notes: ''
   });
 
@@ -266,23 +269,25 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
   const handleRecordMilkIntake = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!milkIntake.farmerId || milkIntake.quantity <= 0) {
-      alert('Please select a farmer and enter a valid quantity');
+    if (!milkIntake.farmerId || milkIntake.quantity <= 0 || milkIntake.pricePerLiter <= 0) {
+      alert('Please select a farmer and enter valid quantity and price');
       return;
     }
 
     try {
       setIsUpdating('recording-intake');
 
+      const totalAmount = milkIntake.quantity * milkIntake.pricePerLiter;
+
       await addPickupLog({
         farmerId: milkIntake.farmerId,
         supplierId: currentPartner?.supplierId || '',
         deliveryPartnerId: partnerId,
         quantity: milkIntake.quantity,
-        qualityGrade: 'A',
-        fatContent: 0,
-        pricePerLiter: 0,
-        totalAmount: 0,
+        qualityGrade: milkIntake.qualityGrade,
+        fatContent: milkIntake.fatContent,
+        pricePerLiter: milkIntake.pricePerLiter,
+        totalAmount: totalAmount,
         date: today,
         pickupTime: new Date().toISOString(),
         status: 'completed',
@@ -313,11 +318,14 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
       });
 
       const farmer = farmers.find(f => f.id === milkIntake.farmerId);
-      alert(`Milk intake recorded!\n\nFarmer: ${farmer?.name}\nQuantity: ${milkIntake.quantity}L\n\nYour allocated milk has been increased by ${milkIntake.quantity}L`);
+      alert(`Milk intake recorded!\n\nFarmer: ${farmer?.name}\nQuantity: ${milkIntake.quantity}L\nQuality: ${milkIntake.qualityGrade}\nPrice: ₹${milkIntake.pricePerLiter}/L\nTotal: ₹${totalAmount.toFixed(2)}\n\nYour allocated milk has been increased by ${milkIntake.quantity}L`);
 
       setMilkIntake({
         farmerId: '',
         quantity: 0,
+        qualityGrade: 'A',
+        fatContent: 0,
+        pricePerLiter: 0,
         notes: ''
       });
 
@@ -910,98 +918,161 @@ const DeliveryPartnerDashboard: React.FC<DeliveryPartnerDashboardProps> = ({ use
               </div>
             </div>
 
-            <form onSubmit={handleRecordMilkIntake} className="space-y-4 max-w-2xl">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Select Farmer <span className="text-red-500">*</span>
-                </label>
-                <select
-                  value={milkIntake.farmerId}
-                  onChange={(e) => setMilkIntake({ ...milkIntake, farmerId: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Choose a farmer</option>
-                  {farmers
-                    .filter(f => f.supplierId === currentPartner?.supplierId)
-                    .map(farmer => (
-                      <option key={farmer.id} value={farmer.id}>
-                        {farmer.name} - {farmer.phone}
-                      </option>
-                    ))}
-                </select>
+            <form onSubmit={handleRecordMilkIntake} className="mb-8 space-y-4 max-w-3xl">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Select Farmer <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={milkIntake.farmerId}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, farmerId: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Choose a farmer</option>
+                    {farmers
+                      .filter(f => f.supplierId === currentPartner?.supplierId && f.status === 'active')
+                      .map(farmer => (
+                        <option key={farmer.id} value={farmer.id}>
+                          {farmer.name} - {farmer.phone}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantity (Liters) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.5"
+                    min="0.5"
+                    value={milkIntake.quantity || ''}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, quantity: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Enter quantity"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quality Grade <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={milkIntake.qualityGrade}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, qualityGrade: e.target.value as 'A' | 'B' | 'C' })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="A">Grade A (Premium)</option>
+                    <option value="B">Grade B (Standard)</option>
+                    <option value="C">Grade C (Basic)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Fat Content (%)
+                  </label>
+                  <input
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="100"
+                    value={milkIntake.fatContent || ''}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, fatContent: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Fat percentage"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price per Liter (₹) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={milkIntake.pricePerLiter || ''}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, pricePerLiter: parseFloat(e.target.value) || 0 })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Price per liter"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total Amount (₹)
+                  </label>
+                  <input
+                    type="text"
+                    value={`₹${(milkIntake.quantity * milkIntake.pricePerLiter).toFixed(2)}`}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    disabled
+                  />
+                </div>
+
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Notes
+                  </label>
+                  <textarea
+                    value={milkIntake.notes}
+                    onChange={(e) => setMilkIntake({ ...milkIntake, notes: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    placeholder="Additional notes (optional)"
+                    rows={2}
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Quantity (Liters) <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  step="0.5"
-                  min="0.5"
-                  value={milkIntake.quantity || ''}
-                  onChange={(e) => setMilkIntake({ ...milkIntake, quantity: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter quantity in liters"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Notes
-                </label>
-                <textarea
-                  value={milkIntake.notes}
-                  onChange={(e) => setMilkIntake({ ...milkIntake, notes: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Any additional notes (optional)"
-                  rows={3}
-                />
-              </div>
-
-              <div className="flex space-x-4 pt-4">
+              <div className="flex space-x-3">
                 <button
                   type="submit"
                   disabled={isUpdating === 'recording-intake'}
-                  className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
                 >
                   {isUpdating === 'recording-intake' ? 'Recording...' : 'Record Milk Intake'}
                 </button>
                 <button
                   type="button"
-                  onClick={() => setMilkIntake({ farmerId: '', quantity: 0, notes: '' })}
-                  className="px-6 py-3 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
+                  onClick={() => setMilkIntake({ farmerId: '', quantity: 0, qualityGrade: 'A', fatContent: 0, pricePerLiter: 0, notes: '' })}
+                  className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50 transition-colors"
                 >
-                  Clear Form
+                  Clear
                 </button>
               </div>
             </form>
 
-            {/* Recent Pickups */}
-            <div className="mt-8 pt-8 border-t">
-              <h4 className="font-semibold text-gray-900 mb-4">Today's Pickup Logs</h4>
+            {/* Today's Pickup Logs */}
+            <div>
+              <h4 className="font-semibold text-gray-900 mb-4">Today's Milk Collection ({pickupLogs.filter(p => p.deliveryPartnerId === partnerId && p.date === today).length})</h4>
               <div className="space-y-3">
                 {pickupLogs
-                  .filter(log => log.deliveryPartnerId === partnerId && log.date === today)
+                  .filter(p => p.deliveryPartnerId === partnerId && p.date === today)
                   .map(log => {
                     const farmer = farmers.find(f => f.id === log.farmerId);
                     return (
                       <div key={log.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-                        <div>
+                        <div className="flex-1">
                           <p className="font-medium text-gray-900">{farmer?.name || 'Unknown Farmer'}</p>
-                          <p className="text-sm text-gray-500">{log.notes}</p>
+                          <p className="text-sm text-gray-500">Quality: {log.qualityGrade} | Fat: {log.fatContent}% | {log.notes}</p>
                         </div>
-                        <div className="text-right">
+                        <div className="text-right ml-4">
                           <p className="text-lg font-bold text-blue-600">{log.quantity}L</p>
-                          <p className="text-xs text-gray-500">{new Date(log.createdAt).toLocaleTimeString()}</p>
+                          <p className="text-sm text-gray-600">₹{log.pricePerLiter}/L</p>
+                          <p className="text-sm font-semibold text-green-600">₹{log.totalAmount.toFixed(2)}</p>
                         </div>
                       </div>
                     );
                   })}
-                {pickupLogs.filter(log => log.deliveryPartnerId === partnerId && log.date === today).length === 0 && (
-                  <p className="text-center text-gray-500 py-4">No pickup logs recorded today</p>
+                {pickupLogs.filter(p => p.deliveryPartnerId === partnerId && p.date === today).length === 0 && (
+                  <p className="text-center text-gray-500 py-8">No milk intake recorded today</p>
                 )}
               </div>
             </div>
