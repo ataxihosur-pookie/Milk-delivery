@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, Menu, X, Truck, Users, Package, Calendar, Milk, ShoppingBag, Newspaper, DollarSign, UserPlus, FileText } from 'lucide-react';
+import { LogOut, Menu, X, Truck, Users, Package, Calendar, Milk, ShoppingBag, Newspaper, DollarSign, UserPlus, FileText, PackageOpen } from 'lucide-react';
 import { User } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import AllocateMilk from './AllocateMilk';
@@ -11,6 +11,7 @@ import SupplierProducts from './SupplierProducts';
 import SupplierOrders from './SupplierOrders';
 import SupplierUpdates from './SupplierUpdates';
 import AddCustomer from './AddCustomer';
+import FarmerManagement from './FarmerManagement';
 
 interface SupplierDashboardProps {
   user: User;
@@ -42,8 +43,9 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
     { id: 'delivery-partners', label: 'Delivery Partners', icon: Truck },
     { id: 'customers', label: 'Customers', icon: Users },
     { id: 'farmers', label: 'Farmers', icon: UserPlus },
-    { id: 'milk-intake', label: 'Milk Intake', icon: Milk },
+    { id: 'milk-allocation', label: 'Milk Allocation', icon: Milk },
     { id: 'deliveries', label: 'Deliveries', icon: Calendar },
+    { id: 'temporary-deliveries', label: 'Temporary Deliveries', icon: PackageOpen },
     { id: 'customer-assignment', label: 'Customer Assignment', icon: FileText },
     { id: 'pricing', label: 'Pricing', icon: DollarSign }
   ];
@@ -65,9 +67,11 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
         return <AddDeliveryPartner supplierId={supplierId} />;
       case 'customers':
         return <AddCustomer supplierId={supplierId} />;
+      case 'farmers':
+        return <FarmerManagement supplierId={supplierId} />;
       case 'customer-assignment':
         return <CustomerAssignment supplierId={supplierId} />;
-      case 'milk-intake':
+      case 'milk-allocation':
         return <AllocateMilk supplierId={supplierId} />;
       case 'pricing':
         return <SupplierPricing supplierId={supplierId} />;
@@ -98,30 +102,12 @@ const SupplierDashboard: React.FC<SupplierDashboardProps> = ({ user, onLogout })
             </div>
           </div>
         );
-      case 'farmers':
+      case 'temporary-deliveries':
         return (
           <div className="p-4">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Farmers</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">Temporary Deliveries</h2>
             <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <p className="text-sm text-gray-600">Total Farmers</p>
-                  <p className="text-2xl font-bold text-green-600">{myFarmers.length}</p>
-                </div>
-              </div>
-              {myFarmers.length === 0 ? (
-                <p className="text-gray-500 text-center mt-6">No farmers added yet</p>
-              ) : (
-                <div className="mt-6 space-y-3">
-                  {myFarmers.map(farmer => (
-                    <div key={farmer.id} className="border border-gray-200 rounded-lg p-4">
-                      <h3 className="font-semibold text-gray-900">{farmer.name}</h3>
-                      <p className="text-sm text-gray-600">{farmer.phone}</p>
-                      <p className="text-sm text-gray-500">{farmer.address}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
+              <p className="text-gray-500 text-center">Temporary delivery management will be added here</p>
             </div>
           </div>
         );

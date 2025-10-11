@@ -1,13 +1,12 @@
 import React, { useState } from 'react';
-import { X, Calendar, Truck, Droplets, Plus, Check } from 'lucide-react';
+import { Calendar, Truck, Droplets, Plus, Check } from 'lucide-react';
 import { useData } from '../context/DataContext';
 
 interface AllocateMilkProps {
   supplierId: string;
-  onClose: () => void;
 }
 
-const AllocateMilk: React.FC<AllocateMilkProps> = ({ supplierId, onClose }) => {
+const AllocateMilk: React.FC<AllocateMilkProps> = ({ supplierId }) => {
   const { deliveryPartners, customers, addDelivery, addDailyAllocation } = useData();
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [selectedPartner, setSelectedPartner] = useState<string | null>(null);
@@ -95,80 +94,76 @@ const AllocateMilk: React.FC<AllocateMilkProps> = ({ supplierId, onClose }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-6xl w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <div className="flex items-center space-x-3">
-            <div className="p-2 bg-blue-100 rounded-lg">
-              <Droplets className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <h3 className="text-xl font-semibold text-gray-900">Individual Milk Allocation</h3>
-              <p className="text-sm text-gray-500">Allocate milk to each delivery partner individually</p>
-            </div>
+    <div className="p-4">
+      <div className="mb-6">
+        <div className="flex items-center space-x-3">
+          <div className="p-2 bg-blue-100 rounded-lg">
+            <Droplets className="h-6 w-6 text-blue-600" />
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 transition-colors">
-            <X className="h-6 w-6" />
-          </button>
-        </div>
-
-        {/* Date Selection */}
-        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg mb-6 border-l-4 border-blue-500">
-          <div className="flex items-center space-x-4">
-            <Calendar className="h-5 w-5 text-blue-600" />
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Allocation Date
-              </label>
-              <input
-                type="date"
-                value={selectedDate}
-                onChange={(e) => setSelectedDate(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
-                required
-              />
-            </div>
-            <div className="ml-auto text-right">
-              <div className="text-lg font-bold text-blue-600">
-                {completedAllocations.size} / {myDeliveryPartners.length}
-              </div>
-              <div className="text-sm text-gray-500">Partners Allocated</div>
-            </div>
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900">Milk Allocation</h2>
+            <p className="text-sm text-gray-500">Allocate milk to each delivery partner individually</p>
           </div>
         </div>
+      </div>
 
-        {myDeliveryPartners.length === 0 ? (
-          <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
-            <Truck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Delivery Partners</h3>
-            <p className="text-gray-500 mb-4">Add delivery partners first to allocate milk</p>
+      {/* Date Selection */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-4 rounded-lg mb-6 border-l-4 border-blue-500">
+        <div className="flex items-center space-x-4">
+          <Calendar className="h-5 w-5 text-blue-600" />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Allocation Date
+            </label>
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => setSelectedDate(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              required
+            />
           </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Delivery Partners List */}
-            <div>
-              <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
-                <Truck className="h-5 w-5 mr-2 text-gray-600" />
-                Select Delivery Partner
-              </h4>
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {myDeliveryPartners.map((partner) => {
-                  const isCompleted = completedAllocations.has(partner.id);
-                  const isSelected = selectedPartner === partner.id;
-                  const assignedCustomers = getAssignedCustomers(partner.id);
-                  
-                  return (
-                    <div
-                      key={partner.id}
-                      className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
-                        isCompleted
-                          ? 'border-green-300 bg-green-50'
-                          : isSelected
-                          ? 'border-blue-500 bg-blue-50 shadow-md'
-                          : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
-                      }`}
-                      onClick={() => !isCompleted && handlePartnerSelect(partner.id)}
-                    >
+          <div className="ml-auto text-right">
+            <div className="text-lg font-bold text-blue-600">
+              {completedAllocations.size} / {myDeliveryPartners.length}
+            </div>
+            <div className="text-sm text-gray-500">Partners Allocated</div>
+          </div>
+        </div>
+      </div>
+
+      {myDeliveryPartners.length === 0 ? (
+        <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+          <Truck className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Delivery Partners</h3>
+          <p className="text-gray-500 mb-4">Add delivery partners first to allocate milk</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Delivery Partners List */}
+          <div>
+            <h4 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+              <Truck className="h-5 w-5 mr-2 text-gray-600" />
+              Select Delivery Partner
+            </h4>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {myDeliveryPartners.map((partner) => {
+                const isCompleted = completedAllocations.has(partner.id);
+                const isSelected = selectedPartner === partner.id;
+                const assignedCustomers = getAssignedCustomers(partner.id);
+
+                return (
+                  <div
+                    key={partner.id}
+                    className={`p-4 border-2 rounded-xl cursor-pointer transition-all duration-200 ${
+                      isCompleted
+                        ? 'border-green-300 bg-green-50'
+                        : isSelected
+                        ? 'border-blue-500 bg-blue-50 shadow-md'
+                        : 'border-gray-200 bg-white hover:border-blue-300 hover:shadow-sm'
+                    }`}
+                    onClick={() => !isCompleted && handlePartnerSelect(partner.id)}
+                  >
                       <div className="flex items-center justify-between">
                         <div className="flex items-center space-x-3">
                           <div className={`p-2 rounded-lg ${
@@ -310,30 +305,21 @@ const AllocateMilk: React.FC<AllocateMilkProps> = ({ supplierId, onClose }) => {
               )}
             </div>
           </div>
-        )}
+      )}
 
-        {/* Action Buttons */}
+      {/* Summary */}
+      {completedAllocations.size > 0 && (
         <div className="flex justify-between items-center pt-6 border-t border-gray-200 mt-6">
-          <div className="text-sm text-gray-500">
-            {completedAllocations.size > 0 && (
-              <span>✓ {completedAllocations.size} partner(s) allocated successfully</span>
-            )}
+          <div className="text-sm text-green-600 font-medium">
+            ✓ {completedAllocations.size} partner(s) allocated successfully
           </div>
-          <div className="flex space-x-4">
-            <button
-              onClick={onClose}
-              className="py-2 px-6 border-2 border-gray-300 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-            >
-              {completedAllocations.size > 0 ? 'Done' : 'Cancel'}
-            </button>
-            {completedAllocations.size === myDeliveryPartners.length && myDeliveryPartners.length > 0 && (
-              <div className="py-2 px-6 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
-                All Partners Allocated! 🎉
-              </div>
-            )}
-          </div>
+          {completedAllocations.size === myDeliveryPartners.length && myDeliveryPartners.length > 0 && (
+            <div className="py-2 px-6 bg-green-100 text-green-800 rounded-lg text-sm font-medium">
+              All Partners Allocated! 🎉
+            </div>
+          )}
         </div>
-      </div>
+      )}
     </div>
   );
 };
